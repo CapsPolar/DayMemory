@@ -214,7 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Import action logic
+    // Updated Import action logic: Accepts the string blindly and refreshes the page
     submitImportBtn.addEventListener('click', () => {
         const importedString = importInput.value.trim();
         
@@ -223,35 +223,23 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        try {
-            // Cryptographic Integrity Verification Check:
-            // Attempt to decrypt the pasted string using the CURRENT active window password
-            const bytes = CryptoJS.AES.decrypt(importedString, sessionKey);
-            const decryptedString = bytes.toString(CryptoJS.enc.Utf8);
-            
-            if (!decryptedString) {
-                throw new Error("Wrong key mapping layout context");
-            }
-            
-            // Check parsing compatibility
-            const parsedData = JSON.parse(decryptedString);
-            if (!Array.isArray(parsedData)) {
-                throw new Error("Data payload layout structured incorrectly.");
-            }
-
-            // If verified, replace local variable references and sync to persistent hardware memory
-            decryptedTimeline = parsedData;
-            localStorage.setItem('dayMemoryVault', importedString);
-
-            // Re-render display timeline layers smoothly
-            displayMemories(true);
-            updateFormContext(getTodayKey());
-            importPanel.classList.add('visual-hidden');
-            alert("Vault backup successfully verified and restored!");
-            
-        } catch (e) {
-            showImportError("Import failed! The data is corrupted, improperly structured, or wasn't encrypted with your current active password.");
+        // Basic structural check to make sure it's not random empty prose
+        // AES ciphertext strings from CryptoJS usually don't have spaces and are base64-like
+        if (importedString.length < 20 || importedString.includes(" ")) {
+            showImportError("This doesn't look like a valid encrypted DayMemory string.");
+            return;
         }
+
+        // 1. Blindly overwrite the persistent storage with the new string
+        localStorage.setItem('dayMemoryVault', importedString);
+
+        // 2. Alert the user and immediately restart the app environment
+        alert("Encrypted vault string imported successfully! The app will now reload to ask for the password to this vault.");
+        
+        // 3. Clear runtime session memory and force a hard page refresh
+        sessionKey = "";
+        decryptedTimeline = [];
+        window.location.reload();
     });
 
     function showImportError(msg) {
