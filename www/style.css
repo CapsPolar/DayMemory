@@ -291,3 +291,80 @@ button:hover {
     background-color: var(--bg-color);
     border-color: var(--border-color);
 }
+
+
+/* --- Backup Panel Styling --- */
+.section-divider {
+    border: 0;
+    height: 1px;
+    background: var(--border-color);
+    margin: 3rem 0 2rem 0;
+}
+
+.backup-section h3 {
+    font-size: 1.1rem;
+    margin-bottom: 0.25rem;
+}
+
+.section-desc {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+}
+
+.backup-actions {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.backup-actions .secondary-btn {
+    flex: 1;
+    margin-top: 0;
+    padding: 0.6rem;
+}
+
+.panel-box {
+    background-color: var(--card-bg);
+    border: 1px dashed var(--border-color);
+    padding: 1.25rem;
+    border-radius: 8px;
+    margin-top: 1rem;
+    animation: fadeIn 0.2s ease-in-out;
+}
+
+.panel-box label {
+    font-size: 0.85rem;
+    font-weight: 700;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.panel-box textarea {
+    min-height: 80px;
+    font-size: 0.8rem;
+    font-family: monospace;
+    margin-bottom: 0.75rem;
+}
+
+.status-msg {
+    display: inline-block;
+    font-size: 0.85rem;
+    margin-left: 1rem;
+    font-weight: 600;
+    color: #10b981; /* Green success indicator color */
+}
+
+.text-danger {
+    color: #ef4444 !important;
+}
+
+.danger-btn {
+    background-color: #ef4444;
+}
+
+.danger-btn:hover {
+    background-color: #dc2626;
+}
+
+

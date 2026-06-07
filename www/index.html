@@ -45,6 +45,31 @@
                 <h2>Your Secure Timeline</h2>
                 <div id="memories-container"></div>
             </section>
+
+            <hr class="section-divider">
+            <section class="backup-section">
+                <h3>Vault Portability & Backups</h3>
+                <p class="section-desc">Export your single encrypted data string to back it up, or import an existing data string from another backup.</p>
+                
+                <div class="backup-actions">
+                    <button id="export-trigger-btn" class="secondary-btn">Export Vault String</button>
+                    <button id="import-trigger-btn" class="secondary-btn">Import Vault String</button>
+                </div>
+
+                <div id="export-panel" class="panel-box visual-hidden">
+                    <label for="export-output">Your Encrypted Vault String:</label>
+                    <textarea id="export-output" readonly placeholder="Your raw encrypted block will appear here..."></textarea>
+                    <button id="copy-vault-btn">Copy to Clipboard</button>
+                    <span id="copy-status" class="status-msg"></span>
+                </div>
+
+                <div id="import-panel" class="panel-box visual-hidden">
+                    <label for="import-input">Paste Encrypted Vault String:</label>
+                    <textarea id="import-input" placeholder="Paste your previously exported encrypted string here..."></textarea>
+                    <button id="submit-import-btn" class="danger-btn">Overwrite & Restore Timeline</button>
+                    <span id="import-status" class="status-msg text-danger"></span>
+                </div>
+            </section>
         </main>
     </div>
     <script src="script.js"></script>

@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // DOM Elements
+    // Core DOM Elements
     const authModal = document.getElementById('auth-modal');
     const authForm = document.getElementById('auth-form');
     const passwordInput = document.getElementById('password-input');
@@ -12,14 +12,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const memoriesContainer = document.getElementById('memories-container');
     const lockBtn = document.getElementById('lock-btn');
 
+    // NEW: Portability Elements
+    const exportTriggerBtn = document.getElementById('export-trigger-btn');
+    const importTriggerBtn = document.getElementById('import-trigger-btn');
+    const exportPanel = document.getElementById('export-panel');
+    const importPanel = document.getElementById('import-panel');
+    const exportOutput = document.getElementById('export-output');
+    const copyVaultBtn = document.getElementById('copy-vault-btn');
+    const copyStatus = document.getElementById('copy-status');
+    const importInput = document.getElementById('import-input');
+    const submitImportBtn = document.getElementById('submit-import-btn');
+    const importStatus = document.getElementById('import-status');
+
     // Volatile runtime state
     let sessionKey = ""; 
     let decryptedTimeline = []; 
-    
-    // Target state tracker for edits: either 'today' or a historic 'YYYY-MM-DD' key
     let currentTargetDateKey = getTodayKey(); 
 
-    // Helper: Generate local YYYY-MM-DD identifier
     function getTodayKey() {
         const d = new Date();
         const offset = d.getTimezoneOffset();
@@ -27,7 +36,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return localDate.toISOString().split('T')[0];
     }
 
-    // Helper: Turn YYYY-MM-DD string into a beautiful readable label
     function formatReadableDate(dateString) {
         const [year, month, day] = dateString.split('-');
         const dateObj = new Date(year, month - 1, day);
@@ -36,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Handle Authentication
+    // Auth Controller
     authForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const enteredPassword = passwordInput.value.trim();
@@ -75,7 +83,6 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('dayMemoryVault', ciphertext);
     }
 
-    // Adjusts the top layout input values based on whether you are editing today or a past card
     function updateFormContext(dateKey) {
         currentTargetDateKey = dateKey;
         const existingEntry = decryptedTimeline.find(item => item.id === dateKey);
@@ -90,39 +97,30 @@ document.addEventListener('DOMContentLoaded', () => {
             formLabel.textContent = `Write about today (${formatReadableDate(dateKey)}):`;
             saveBtn.textContent = "Save New Memory";
         }
-        memoryInput.focus();
     }
 
-    // Handle form submit (Both New submissions and Edits)
     memoryForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const text = memoryInput.value.trim();
         if (!text) return;
 
         const existingIndex = decryptedTimeline.findIndex(item => item.id === currentTargetDateKey);
-
         if (existingIndex !== -1) {
-            // Update mode
             decryptedTimeline[existingIndex].text = text;
         } else {
-            // New mode for a missing calendar node
-            const newMemory = {
-                id: currentTargetDateKey, // Primary Key is explicitly the string date 'YYYY-MM-DD'
+            decryptedTimeline.push({
+                id: currentTargetDateKey,
                 text: text,
                 readableDate: formatReadableDate(currentTargetDateKey)
-            };
-            decryptedTimeline.push(newMemory);
-            
-            // Re-sort the local timeline elements array chronologically descending
+            });
             decryptedTimeline.sort((a, b) => b.id.localeCompare(a.id));
         }
 
         encryptAndSaveVault();
         displayMemories(true);
-        updateFormContext(getTodayKey()); // Reset back down to target today
+        updateFormContext(getTodayKey());
     });
 
-    // Render Timeline View
     function displayMemories(isSuccessfullyDecrypted) {
         memoriesContainer.innerHTML = '';
 
@@ -138,16 +136,18 @@ document.addEventListener('DOMContentLoaded', () => {
             memoryInput.disabled = true;
             saveBtn.disabled = true;
             saveBtn.textContent = "Vault Locked";
+            
+            // Hide export features if decryption failed
+            document.querySelector('.backup-section').style.display = 'none';
             return;
         }
+
+        document.querySelector('.backup-section').style.display = 'block';
 
         if (decryptedTimeline.length === 0) {
             memoriesContainer.innerHTML = '<p class="no-memories">Your secure vault is empty. Write your first entry above!</p>';
             return;
         }
-
-        memoryInput.disabled = false;
-        saveBtn.disabled = false;
 
         decryptedTimeline.forEach((memory) => {
             const card = document.createElement('div');
@@ -160,7 +160,6 @@ document.addEventListener('DOMContentLoaded', () => {
             dateDiv.className = 'memory-date';
             dateDiv.textContent = memory.readableDate;
 
-            // Small edit toggle element injection
             const editBtn = document.createElement('button');
             editBtn.className = 'edit-action-btn';
             editBtn.textContent = "Edit";
@@ -180,6 +179,84 @@ document.addEventListener('DOMContentLoaded', () => {
             card.appendChild(textDiv);
             memoriesContainer.appendChild(card);
         });
+    }
+
+    // --- NEW: BACKUP MANAGEMENT IMPLEMENTATION ---
+
+    // Toggle Panels
+    exportTriggerBtn.addEventListener('click', () => {
+        importPanel.classList.add('visual-hidden');
+        exportPanel.classList.toggle('visual-hidden');
+        
+        if (!exportPanel.classList.contains('visual-hidden')) {
+            // Pull raw encrypted data directly from LocalStorage to ensure accuracy
+            exportOutput.value = localStorage.getItem('dayMemoryVault') || "";
+            exportOutput.select();
+        }
+    });
+
+    importTriggerBtn.addEventListener('click', () => {
+        exportPanel.classList.add('visual-hidden');
+        importPanel.classList.toggle('visual-hidden');
+        importInput.value = "";
+    });
+
+    // Clipboard copy action using modern asynchronous API
+    copyVaultBtn.addEventListener('click', () => {
+        if (!exportOutput.value) return;
+        
+        navigator.clipboard.writeText(exportOutput.value).then(() => {
+            copyStatus.textContent = "Copied successfully!";
+            setTimeout(() => { copyStatus.textContent = ""; }, 3000);
+        }).catch(err => {
+            copyStatus.className = "status-msg text-danger";
+            copyStatus.textContent = "Failed to copy.";
+        });
+    });
+
+    // Import action logic
+    submitImportBtn.addEventListener('click', () => {
+        const importedString = importInput.value.trim();
+        
+        if (!importedString) {
+            showImportError("Please paste a valid encrypted string.");
+            return;
+        }
+
+        try {
+            // Cryptographic Integrity Verification Check:
+            // Attempt to decrypt the pasted string using the CURRENT active window password
+            const bytes = CryptoJS.AES.decrypt(importedString, sessionKey);
+            const decryptedString = bytes.toString(CryptoJS.enc.Utf8);
+            
+            if (!decryptedString) {
+                throw new Error("Wrong key mapping layout context");
+            }
+            
+            // Check parsing compatibility
+            const parsedData = JSON.parse(decryptedString);
+            if (!Array.isArray(parsedData)) {
+                throw new Error("Data payload layout structured incorrectly.");
+            }
+
+            // If verified, replace local variable references and sync to persistent hardware memory
+            decryptedTimeline = parsedData;
+            localStorage.setItem('dayMemoryVault', importedString);
+
+            // Re-render display timeline layers smoothly
+            displayMemories(true);
+            updateFormContext(getTodayKey());
+            importPanel.classList.add('visual-hidden');
+            alert("Vault backup successfully verified and restored!");
+            
+        } catch (e) {
+            showImportError("Import failed! The data is corrupted, improperly structured, or wasn't encrypted with your current active password.");
+        }
+    });
+
+    function showImportError(msg) {
+        importStatus.textContent = msg;
+        setTimeout(() => { importStatus.textContent = ""; }, 6000);
     }
 
     lockBtn.addEventListener('click', () => {
