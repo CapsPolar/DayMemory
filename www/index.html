@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DayMemory (Zero-Knowledge Vault)</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+</head>
+<body>
+    <div id="auth-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 id="modal-title">Unlock Your Vault</h2>
+            <p id="modal-desc">Enter your password. Because this app is entirely zero-knowledge, entering a wrong password will simply fail to decrypt your data properly.</p>
+            <form id="auth-form">
+                <input 
+                    type="password" 
+                    id="password-input" 
+                    placeholder="Enter your master password" 
+                    required 
+                    autocomplete="off"
+                >
+                <button type="submit" id="modal-submit-btn">Unlock Vault</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="app-container visual-hidden" id="main-app">
+        <header>
+            <h1>DayMemory</h1>
+            <p>Your zero-knowledge, military-grade diary.</p>
+            <button id="lock-btn" class="secondary-btn">Lock App</button>
+        </header>
+
+        <main>
+            <form id="memory-form">
+                <div class="input-group">
+                    <label for="memory-input">How was your day?</label>
+                    <textarea id="memory-input" placeholder="Write your description here..." required></textarea>
+                </div>
+                <button type="submit" id="save-btn">Encrypt & Save Memory</button>
+            </form>
+
+            <section class="memories-section">
+                <h2>Your Secure Timeline</h2>
+                <div id="memories-container"></div>
+            </section>
+        </main>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
