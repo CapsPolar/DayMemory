@@ -7,99 +7,125 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const memoryForm = document.getElementById('memory-form');
     const memoryInput = document.getElementById('memory-input');
+    const formLabel = document.getElementById('form-label');
+    const saveBtn = document.getElementById('save-btn');
     const memoriesContainer = document.getElementById('memories-container');
     const lockBtn = document.getElementById('lock-btn');
 
     // Volatile runtime state
     let sessionKey = ""; 
-    let decryptedTimeline = []; // Holds raw memory objects only in runtime memory
+    let decryptedTimeline = []; 
+    
+    // Target state tracker for edits: either 'today' or a historic 'YYYY-MM-DD' key
+    let currentTargetDateKey = getTodayKey(); 
 
-    // Handle Authentication Modal Submission
+    // Helper: Generate local YYYY-MM-DD identifier
+    function getTodayKey() {
+        const d = new Date();
+        const offset = d.getTimezoneOffset();
+        const localDate = new Date(d.getTime() - (offset * 60 * 1000));
+        return localDate.toISOString().split('T')[0];
+    }
+
+    // Helper: Turn YYYY-MM-DD string into a beautiful readable label
+    function formatReadableDate(dateString) {
+        const [year, month, day] = dateString.split('-');
+        const dateObj = new Date(year, month - 1, day);
+        return dateObj.toLocaleDateString('en-US', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+        });
+    }
+
+    // Handle Authentication
     authForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const enteredPassword = passwordInput.value.trim();
-
         if (!enteredPassword) return;
 
         sessionKey = enteredPassword;
-        
-        // Attempt to decrypt the whole vault right now
         const success = decryptAndLoadVault();
 
-        // Reveal the main application layer regardless of success
         authModal.classList.add('visual-hidden');
         mainApp.classList.remove('visual-hidden');
         
-        // Render whatever we have (valid timeline or single error block)
         displayMemories(success);
+        if (success) updateFormContext(getTodayKey());
     });
 
-    // Decrypt the single vault string from localStorage
     function decryptAndLoadVault() {
         const encryptedVault = localStorage.getItem('dayMemoryVault');
-        
-        // If there's no vault data at all, it's a fresh initialization
         if (!encryptedVault) {
             decryptedTimeline = [];
             return true;
         }
-
         try {
-            // Decrypt the entire master string using the sessionKey
             const bytes = CryptoJS.AES.decrypt(encryptedVault, sessionKey);
             const decryptedString = bytes.toString(CryptoJS.enc.Utf8);
-            
-            if (!decryptedString) return false; // Bad password resulting in empty string
-            
-            // Parse the decrypted string back into the working array
+            if (!decryptedString) return false;
             decryptedTimeline = JSON.parse(decryptedString);
             return true;
         } catch (error) {
-            return false; // Decryption failed or JSON parsing broke due to bad key
+            return false;
         }
     }
 
-    // Encrypt and Save the Entire Vault State
     function encryptAndSaveVault() {
-        // Stringify the whole array of entries at once
         const stringifiedVault = JSON.stringify(decryptedTimeline);
-        
-        // Encrypt that single string
         const ciphertext = CryptoJS.AES.encrypt(stringifiedVault, sessionKey).toString();
-        
-        // Store it as a single entry in LocalStorage
         localStorage.setItem('dayMemoryVault', ciphertext);
     }
 
-    // Handle saving new entries
+    // Adjusts the top layout input values based on whether you are editing today or a past card
+    function updateFormContext(dateKey) {
+        currentTargetDateKey = dateKey;
+        const existingEntry = decryptedTimeline.find(item => item.id === dateKey);
+        const isToday = (dateKey === getTodayKey());
+
+        if (existingEntry) {
+            memoryInput.value = existingEntry.text;
+            formLabel.textContent = isToday ? `Editing today's reflection (${formatReadableDate(dateKey)}):` : `Editing historical record for ${formatReadableDate(dateKey)}:`;
+            saveBtn.textContent = "Update Memory";
+        } else {
+            memoryInput.value = "";
+            formLabel.textContent = `Write about today (${formatReadableDate(dateKey)}):`;
+            saveBtn.textContent = "Save New Memory";
+        }
+        memoryInput.focus();
+    }
+
+    // Handle form submit (Both New submissions and Edits)
     memoryForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const text = memoryInput.value.trim();
         if (!text) return;
 
-        const newMemory = {
-            id: Date.now(),
-            text: text,
-            date: new Date().toLocaleDateString('en-US', {
-                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
-            })
-        };
+        const existingIndex = decryptedTimeline.findIndex(item => item.id === currentTargetDateKey);
 
-        // Add new item to the front of the runtime array (Newest first)
-        decryptedTimeline.unshift(newMemory);
+        if (existingIndex !== -1) {
+            // Update mode
+            decryptedTimeline[existingIndex].text = text;
+        } else {
+            // New mode for a missing calendar node
+            const newMemory = {
+                id: currentTargetDateKey, // Primary Key is explicitly the string date 'YYYY-MM-DD'
+                text: text,
+                readableDate: formatReadableDate(currentTargetDateKey)
+            };
+            decryptedTimeline.push(newMemory);
+            
+            // Re-sort the local timeline elements array chronologically descending
+            decryptedTimeline.sort((a, b) => b.id.localeCompare(a.id));
+        }
 
-        // Re-encrypt the entire state and save to disk
         encryptAndSaveVault();
-
         displayMemories(true);
-        memoryForm.reset();
+        updateFormContext(getTodayKey()); // Reset back down to target today
     });
 
-    // Handle UI Rendering
+    // Render Timeline View
     function displayMemories(isSuccessfullyDecrypted) {
         memoriesContainer.innerHTML = '';
 
-        // Case 1: Decryption failed (Wrong password)
         if (!isSuccessfullyDecrypted) {
             const errorCard = document.createElement('div');
             errorCard.className = 'memory-card';
@@ -109,44 +135,53 @@ document.addEventListener('DOMContentLoaded', () => {
             errorCard.textContent = "[Undecipherable vault. The master password entered may be incorrect.]";
             memoriesContainer.appendChild(errorCard);
             
-            // Disable the input form so they can't accidentally overwrite data while locked out
             memoryInput.disabled = true;
-            memoryForm.querySelector('button[type="submit"]').disabled = true;
-            memoryForm.querySelector('button[type="submit"]').textContent = "Vault Locked";
+            saveBtn.disabled = true;
+            saveBtn.textContent = "Vault Locked";
             return;
         }
 
-        // Case 2: Vault is empty but successfully opened
         if (decryptedTimeline.length === 0) {
             memoriesContainer.innerHTML = '<p class="no-memories">Your secure vault is empty. Write your first entry above!</p>';
             return;
         }
 
-        // Ensure inputs are active if successfully decrypted
         memoryInput.disabled = false;
-        memoryForm.querySelector('button[type="submit"]').disabled = false;
-        memoryForm.querySelector('button[type="submit"]').textContent = "Encrypt & Save Memory";
+        saveBtn.disabled = false;
 
-        // Case 3: Loop through and render the raw data already in memory
         decryptedTimeline.forEach((memory) => {
             const card = document.createElement('div');
             card.className = 'memory-card';
 
+            const cardHeader = document.createElement('div');
+            cardHeader.className = 'memory-card-header';
+
             const dateDiv = document.createElement('div');
             dateDiv.className = 'memory-date';
-            dateDiv.textContent = memory.date;
+            dateDiv.textContent = memory.readableDate;
+
+            // Small edit toggle element injection
+            const editBtn = document.createElement('button');
+            editBtn.className = 'edit-action-btn';
+            editBtn.textContent = "Edit";
+            editBtn.addEventListener('click', () => {
+                updateFormContext(memory.id);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+
+            cardHeader.appendChild(dateDiv);
+            cardHeader.appendChild(editBtn);
 
             const textDiv = document.createElement('div');
             textDiv.className = 'memory-text';
             textDiv.textContent = memory.text;
 
-            card.appendChild(dateDiv);
+            card.appendChild(cardHeader);
             card.appendChild(textDiv);
             memoriesContainer.appendChild(card);
         });
     }
 
-    // Manual lock mechanism
     lockBtn.addEventListener('click', () => {
         window.location.reload(); 
     });
