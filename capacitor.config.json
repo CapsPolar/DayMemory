@@ -3,7 +3,7 @@
   "appName": "DayMemory AI",
   "webDir": "www",
   "server": {
-    "androidScheme": "https"
+    "androidScheme": "http"
   },
   "android": {
     "buildOptions": {
