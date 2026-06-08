@@ -437,6 +437,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return stringValue;
     }
 
+    // --- UPDATED CSV MULTI-ROW EXTRACTION AND UNROLLING ENGINE ---
     generateCsvBtn.addEventListener('click', () => {
         if (!activeAgentProfile || decryptedTimeline.length === 0) return;
 
@@ -449,16 +450,47 @@ document.addEventListener('DOMContentLoaded', () => {
         let csvLines = [];
         csvLines.push(baseHeaders); 
 
-        // Order history chronologically ascending for analytical pipeline timelines
+        // Order history chronologically ascending (oldest to newest)
         const orderedTimeline = [...decryptedTimeline].sort((a, b) => a.id.localeCompare(b.id));
 
         orderedTimeline.forEach(entry => {
             const rawInsight = (entry.aiInsights && entry.aiInsights[activeAgentProfile.name]) ? entry.aiInsights[activeAgentProfile.name] : "";
-            
-            const dateCell = escapeCsvCell(entry.id);
-            const insightCell = escapeCsvCell(rawInsight);
+            if (!rawInsight.trim()) return; // Skip blank days entirely to keep the spreadsheet tidy
 
-            csvLines.push(`${dateCell},${insightCell}`);
+            // Step 1: Split the internal day's insight by its line changes
+            const subLines = rawInsight.split(/\r?\n/);
+
+            subLines.forEach(line => {
+                const cleanedLine = line.trim();
+                if (!cleanedLine) return; // Skip empty trailing lines inside an entry
+
+                // FIX START HERE: Split strictly by comma, preserving spaces within words
+                const rawCells = cleanedLine.split(',');
+
+                // Step 3: Prepare the row array, anchoring the first column with the entry date
+                let rowCells = [escapeCsvCell(entry.id)];
+
+                // Step 4: Clean, trim, and parse numbers for all extracted cells
+                rawCells.forEach(cell => {
+                    let standardCell = cell.trim();
+                    
+                    // Strip outermost quotes if the text chunk already has them
+                    if (standardCell.startsWith('"') && standardCell.endsWith('"')) {
+                        standardCell = standardCell.slice(1, -1).trim();
+                    }
+
+                    // Attempt numerical conversion (integerize or floatize)
+                    if (standardCell !== "" && !isNaN(standardCell)) {
+                        rowCells.push(Number(standardCell));
+                    } else {
+                        // This securely handles internal spaces and special characters
+                        rowCells.push(escapeCsvCell(standardCell));
+                    }
+                });
+
+                // Step 5: Join the extracted data components with standard spacing
+                csvLines.push(rowCells.join(', '));
+            });
         });
 
         csvTextarea.value = csvLines.join('\n');
