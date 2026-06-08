@@ -34,7 +34,7 @@
                 </div>
                 <div class="input-group">
                     <label for="ai-prompt">System/Analysis Prompt:</label>
-                    <textarea id="ai-prompt" placeholder="Extract key insights, mood, metrics, and actionable items..." required></textarea>
+                    <textarea id="ai-prompt" placeholder="Extract key insights, mood, metrics..." required></textarea>
                 </div>
                 <div class="settings-actions">
                     <button type="submit">Save Configurations</button>
@@ -60,6 +60,12 @@
                     <label id="form-label" for="memory-input">Write about today:</label>
                     <textarea id="memory-input" placeholder="Write your description here..." required></textarea>
                 </div>
+                
+                <div id="ai-edit-group" class="input-group visual-hidden">
+                    <label for="ai-memory-input">Edit AI Summary:</label>
+                    <textarea id="ai-memory-input" placeholder="AI analysis text..."></textarea>
+                </div>
+
                 <button type="submit" id="save-btn">Save Memory</button> 
             </form>
 

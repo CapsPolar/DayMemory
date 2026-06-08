@@ -465,3 +465,17 @@ button:hover {
     0%, 100% { opacity: 0.6; }
     50% { opacity: 1; }
 }
+
+
+/* Styling layout for the secondary editing workspace node */
+#ai-memory-input {
+    min-height: 100px;
+    border-color: var(--border-color);
+    background-color: rgba(79, 70, 229, 0.02);
+}
+
+@media (prefers-color-scheme: dark) {
+    #ai-memory-input {
+        background-color: rgba(99, 102, 241, 0.02);
+    }
+}
