@@ -368,3 +368,100 @@ button:hover {
 }
 
 
+
+
+
+/* --- AI Integration & Control Styles --- */
+.header-controls {
+    display: flex;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.header-controls .secondary-btn {
+    margin-top: 0;
+}
+
+.settings-content {
+    max-width: 550px !important;
+    text-align: left !important;
+}
+
+.settings-content h2 {
+    margin-bottom: 0.25rem;
+}
+
+.settings-content p {
+    margin-bottom: 1.5rem;
+}
+
+.settings-content .input-group input {
+    width: 100%;
+    padding: 0.75rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    font-size: 1rem;
+}
+
+.settings-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.settings-actions button {
+    flex: 1;
+}
+
+/* --- AI Card Elements --- */
+.card-actions-wrapper {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.ai-analysis-block {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px dashed var(--border-color);
+    background-color: rgba(79, 70, 229, 0.04);
+    border-radius: 6px;
+    padding: 0.75rem;
+}
+
+@media (prefers-color-scheme: dark) {
+    .ai-analysis-block {
+        background-color: rgba(99, 102, 241, 0.04);
+    }
+}
+
+.ai-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.ai-text {
+    font-size: 0.95rem;
+    font-style: italic;
+    white-space: pre-wrap;
+}
+
+.ai-loading-spinner {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-style: italic;
+    animation: pulse 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+}

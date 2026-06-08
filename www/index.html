@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DayMemory (Zero-Knowledge Vault)</title>
+    <title>DayMemory (AI-Augmented Vault)</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 </head>
@@ -11,16 +11,35 @@
     <div id="auth-modal" class="modal-overlay">
         <div class="modal-content">
             <h2 id="modal-title">Unlock Your Vault</h2>
-            <p id="modal-desc">Enter your password. Because this app is entirely zero-knowledge, entering a wrong password will simply fail to decrypt your data properly.</p>
+            <p id="modal-desc">Enter your password to decrypt your zero-knowledge timeline state.</p>
             <form id="auth-form">
-                <input 
-                    type="password" 
-                    id="password-input" 
-                    placeholder="Enter your master password" 
-                    required 
-                    autocomplete="off"
-                >
+                <input type="password" id="password-input" placeholder="Enter your master password" required autocomplete="off">
                 <button type="submit" id="modal-submit-btn">Unlock Vault</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="settings-modal" class="modal-overlay visual-hidden">
+        <div class="modal-content settings-content">
+            <h2>Ollama AI Settings</h2>
+            <p>Configure connection coordinates for your local machine LLM environment.</p>
+            <form id="settings-form">
+                <div class="input-group">
+                    <label for="ai-endpoint">Ollama Endpoint URL:</label>
+                    <input type="url" id="ai-endpoint" placeholder="http://127.0.0.1:11434" required>
+                </div>
+                <div class="input-group">
+                    <label for="ai-model">Model Name:</label>
+                    <input type="text" id="ai-model" placeholder="llama3" required>
+                </div>
+                <div class="input-group">
+                    <label for="ai-prompt">System/Analysis Prompt:</label>
+                    <textarea id="ai-prompt" placeholder="Extract key insights, mood, metrics, and actionable items..." required></textarea>
+                </div>
+                <div class="settings-actions">
+                    <button type="submit">Save Configurations</button>
+                    <button type="button" id="close-settings-btn" class="secondary-btn">Cancel</button>
+                </div>
             </form>
         </div>
     </div>
@@ -28,8 +47,11 @@
     <div class="app-container visual-hidden" id="main-app">
         <header>
             <h1>DayMemory</h1>
-            <p>Your zero-knowledge, military-grade diary.</p>
-            <button id="lock-btn" class="secondary-btn">Lock App</button>
+            <p>Your zero-knowledge, AI-integrated local vault.</p>
+            <div class="header-controls">
+                <button id="settings-open-btn" class="secondary-btn">⚙️ AI Settings</button>
+                <button id="lock-btn" class="secondary-btn">🔒 Lock App</button>
+            </div>
         </header>
 
         <main>
@@ -58,14 +80,14 @@
 
                 <div id="export-panel" class="panel-box visual-hidden">
                     <label for="export-output">Your Encrypted Vault String:</label>
-                    <textarea id="export-output" readonly placeholder="Your raw encrypted block will appear here..."></textarea>
+                    <textarea id="export-output" readonly></textarea>
                     <button id="copy-vault-btn">Copy to Clipboard</button>
                     <span id="copy-status" class="status-msg"></span>
                 </div>
 
                 <div id="import-panel" class="panel-box visual-hidden">
                     <label for="import-input">Paste Encrypted Vault String:</label>
-                    <textarea id="import-input" placeholder="Paste your previously exported encrypted string here..."></textarea>
+                    <textarea id="import-input" placeholder="Paste encrypted string here..."></textarea>
                     <button id="submit-import-btn" class="danger-btn">Overwrite & Restore Timeline</button>
                     <span id="import-status" class="status-msg text-danger"></span>
                 </div>

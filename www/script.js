@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Core DOM Elements
+    // Core Layout DOM Elements
     const authModal = document.getElementById('auth-modal');
     const authForm = document.getElementById('auth-form');
     const passwordInput = document.getElementById('password-input');
@@ -12,7 +12,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const memoriesContainer = document.getElementById('memories-container');
     const lockBtn = document.getElementById('lock-btn');
 
-    // NEW: Portability Elements
+    // AI Settings UI Elements
+    const settingsModal = document.getElementById('settings-modal');
+    const settingsForm = document.getElementById('settings-form');
+    const aiEndpointInput = document.getElementById('ai-endpoint');
+    const aiModelInput = document.getElementById('ai-model');
+    const aiPromptInput = document.getElementById('ai-prompt');
+    const settingsOpenBtn = document.getElementById('settings-open-btn');
+    const closeSettingsBtn = document.getElementById('close-settings-btn');
+
+    // Portability Elements
     const exportTriggerBtn = document.getElementById('export-trigger-btn');
     const importTriggerBtn = document.getElementById('import-trigger-btn');
     const exportPanel = document.getElementById('export-panel');
@@ -24,10 +33,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const submitImportBtn = document.getElementById('submit-import-btn');
     const importStatus = document.getElementById('import-status');
 
-    // Volatile runtime state
+    // Volatile runtime state variables
     let sessionKey = ""; 
     let decryptedTimeline = []; 
     let currentTargetDateKey = getTodayKey(); 
+
+    // Default configuration tokens for Ollama
+    const defaultAiSettings = {
+        endpoint: "http://127.0.0.1:11434",
+        model: "llama3",
+        prompt: "You are a personal journal assistant. Review the following daily journal entry and extract key insights, emotional tones, core achievements, and any important follow-up action items in a concise, bulleted description format."
+    };
 
     function getTodayKey() {
         const d = new Date();
@@ -44,7 +60,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Auth Controller
+    // Load AI configurations from persistent system memory
+    function getAiSettings() {
+        const stored = localStorage.getItem('dayMemoryAiConfig');
+        return stored ? JSON.parse(stored) : defaultAiSettings;
+    }
+
+    // Initialize Auth Layer
     authForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const enteredPassword = passwordInput.value.trim();
@@ -99,6 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Save/Update records
     memoryForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const text = memoryInput.value.trim();
@@ -111,7 +134,8 @@ document.addEventListener('DOMContentLoaded', () => {
             decryptedTimeline.push({
                 id: currentTargetDateKey,
                 text: text,
-                readableDate: formatReadableDate(currentTargetDateKey)
+                readableDate: formatReadableDate(currentTargetDateKey),
+                aiAnalysis: null // Initialize empty placeholder container
             });
             decryptedTimeline.sort((a, b) => b.id.localeCompare(a.id));
         }
@@ -121,6 +145,63 @@ document.addEventListener('DOMContentLoaded', () => {
         updateFormContext(getTodayKey());
     });
 
+    // --- Dynamic AI Request Mechanism ---
+    async function requestAiAnalysis(dateKey, cardElement) {
+        const entry = decryptedTimeline.find(item => item.id === dateKey);
+        if (!entry) return;
+
+        const aiConfig = getAiSettings();
+        
+        // Setup visual processing element updates
+        const actionArea = cardElement.querySelector('.card-actions-wrapper');
+        const originalContent = actionArea.innerHTML;
+        actionArea.innerHTML = `<span class="ai-loading-spinner">✨ Calling local LLM (${aiConfig.model})... Checking context blocks...</span>`;
+
+        try {
+            // Make direct POST connection call to your running Ollama instance environment
+            const response = await fetch(`${aiConfig.endpoint}/api/generate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model: aiConfig.model,
+                    prompt: `System Guide: ${aiConfig.prompt}\n\nJournal Entry:\n"${entry.text}"`,
+                    stream: false
+                })
+            });
+
+            if (!response.ok) throw new Error("Endpoint connection rejected request.");
+
+            const data = await response.json();
+            const analysisResult = data.response.trim();
+
+            // Store inside current runtime data object array matrices
+            entry.aiAnalysis = analysisResult;
+
+            // Re-encrypt the updated array down to persistent disk storage
+            encryptAndSaveVault();
+            displayMemories(true);
+
+        } catch (err) {
+            alert(`Ollama Integration Error: Could not connect to AI engine. \nVerify that your Ollama server is active at ${aiConfig.endpoint}, the model "${aiConfig.model}" is downloaded, and CORS is enabled via OLLAMA_ORIGINS="*" environment parameters.`);
+            actionArea.innerHTML = originalContent;
+            // Bind back event listeners to recovered elements
+            bindCardActions(cardElement, dateKey);
+        }
+    }
+
+    function bindCardActions(cardElement, dateKey) {
+        cardElement.querySelector('.edit-action-btn').addEventListener('click', () => {
+            updateFormContext(dateKey);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+
+        const aiBtn = cardElement.querySelector('.ai-action-btn');
+        if (aiBtn) {
+            aiBtn.addEventListener('click', () => requestAiAnalysis(dateKey, cardElement));
+        }
+    }
+
+    // Render Timeline View Matrix
     function displayMemories(isSuccessfullyDecrypted) {
         memoriesContainer.innerHTML = '';
 
@@ -135,14 +216,15 @@ document.addEventListener('DOMContentLoaded', () => {
             
             memoryInput.disabled = true;
             saveBtn.disabled = true;
-            saveBtn.textContent = "Vault Locked";
-            
-            // Hide export features if decryption failed
             document.querySelector('.backup-section').style.display = 'none';
+            settingsOpenBtn.style.display = 'none';
             return;
         }
 
         document.querySelector('.backup-section').style.display = 'block';
+        settingsOpenBtn.style.display = 'inline-block';
+        memoryInput.disabled = false;
+        saveBtn.disabled = false;
 
         if (decryptedTimeline.length === 0) {
             memoriesContainer.innerHTML = '<p class="no-memories">Your secure vault is empty. Write your first entry above!</p>';
@@ -160,16 +242,19 @@ document.addEventListener('DOMContentLoaded', () => {
             dateDiv.className = 'memory-date';
             dateDiv.textContent = memory.readableDate;
 
-            const editBtn = document.createElement('button');
-            editBtn.className = 'edit-action-btn';
-            editBtn.textContent = "Edit";
-            editBtn.addEventListener('click', () => {
-                updateFormContext(memory.id);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            });
+            const actionsWrapper = document.createElement('div');
+            actionsWrapper.className = 'card-actions-wrapper';
+
+            // Show "Analyse with AI" button only if analysis hasn't been generated yet
+            const showAiButton = !memory.aiAnalysis;
+
+            actionsWrapper.innerHTML = `
+                ${showAiButton ? '<button class="edit-action-btn ai-action-btn">✨ Analyse with AI</button>' : ''}
+                <button class="edit-action-btn">Edit</button>
+            `;
 
             cardHeader.appendChild(dateDiv);
-            cardHeader.appendChild(editBtn);
+            cardHeader.appendChild(actionsWrapper);
 
             const textDiv = document.createElement('div');
             textDiv.className = 'memory-text';
@@ -177,19 +262,53 @@ document.addEventListener('DOMContentLoaded', () => {
 
             card.appendChild(cardHeader);
             card.appendChild(textDiv);
+
+            // Inject AI results if present inside vault array
+            if (memory.aiAnalysis) {
+                const aiBlock = document.createElement('div');
+                aiBlock.className = 'ai-analysis-block';
+                aiBlock.innerHTML = `
+                    <div class="ai-title">🤖 AI Key Insights Summary</div>
+                    <div class="ai-text">${memory.aiAnalysis}</div>
+                `;
+                card.appendChild(aiBlock);
+            }
+
             memoriesContainer.appendChild(card);
+            bindCardActions(card, memory.id);
         });
     }
 
-    // --- NEW: BACKUP MANAGEMENT IMPLEMENTATION ---
+    // --- Settings UI Handlers ---
+    settingsOpenBtn.addEventListener('click', () => {
+        const config = getAiSettings();
+        aiEndpointInput.value = config.endpoint;
+        aiModelInput.value = config.model;
+        aiPromptInput.value = config.prompt;
+        settingsModal.classList.remove('visual-hidden');
+    });
 
-    // Toggle Panels
+    closeSettingsBtn.addEventListener('click', () => {
+        settingsModal.classList.add('visual-hidden');
+    });
+
+    settingsForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const updatedConfig = {
+            endpoint: aiEndpointInput.value.trim().replace(/\/$/, ""), // strip trailing slashes
+            model: aiModelInput.value.trim(),
+            prompt: aiPromptInput.value.trim()
+        };
+        localStorage.setItem('dayMemoryAiConfig', JSON.stringify(updatedConfig));
+        settingsModal.classList.add('visual-hidden');
+        alert("Local AI configurations successfully saved!");
+    });
+
+    // --- Portability / Backup Operations ---
     exportTriggerBtn.addEventListener('click', () => {
         importPanel.classList.add('visual-hidden');
         exportPanel.classList.toggle('visual-hidden');
-        
         if (!exportPanel.classList.contains('visual-hidden')) {
-            // Pull raw encrypted data directly from LocalStorage to ensure accuracy
             exportOutput.value = localStorage.getItem('dayMemoryVault') || "";
             exportOutput.select();
         }
@@ -201,51 +320,25 @@ document.addEventListener('DOMContentLoaded', () => {
         importInput.value = "";
     });
 
-    // Clipboard copy action using modern asynchronous API
     copyVaultBtn.addEventListener('click', () => {
         if (!exportOutput.value) return;
-        
         navigator.clipboard.writeText(exportOutput.value).then(() => {
             copyStatus.textContent = "Copied successfully!";
             setTimeout(() => { copyStatus.textContent = ""; }, 3000);
-        }).catch(err => {
-            copyStatus.className = "status-msg text-danger";
-            copyStatus.textContent = "Failed to copy.";
         });
     });
 
-    // Updated Import action logic: Accepts the string blindly and refreshes the page
     submitImportBtn.addEventListener('click', () => {
         const importedString = importInput.value.trim();
-        
-        if (!importedString) {
-            showImportError("Please paste a valid encrypted string.");
-            return;
-        }
-
-        // Basic structural check to make sure it's not random empty prose
-        // AES ciphertext strings from CryptoJS usually don't have spaces and are base64-like
+        if (!importedString) return;
         if (importedString.length < 20 || importedString.includes(" ")) {
-            showImportError("This doesn't look like a valid encrypted DayMemory string.");
+            importStatus.textContent = "Invalid entry validation format.";
             return;
         }
-
-        // 1. Blindly overwrite the persistent storage with the new string
         localStorage.setItem('dayMemoryVault', importedString);
-
-        // 2. Alert the user and immediately restart the app environment
-        alert("Encrypted vault string imported successfully! The app will now reload to ask for the password to this vault.");
-        
-        // 3. Clear runtime session memory and force a hard page refresh
-        sessionKey = "";
-        decryptedTimeline = [];
+        alert("Encrypted vault string imported! Reloading environment...");
         window.location.reload();
     });
-
-    function showImportError(msg) {
-        importStatus.textContent = msg;
-        setTimeout(() => { importStatus.textContent = ""; }, 6000);
-    }
 
     lockBtn.addEventListener('click', () => {
         window.location.reload(); 
