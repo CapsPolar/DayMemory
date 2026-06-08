@@ -1,46 +1,68 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Core Layout Elements
+    // 1. Navigation Shell Elements
+    const navItems = document.querySelectorAll('.bottom-nav .nav-item');
+    const viewPanels = document.querySelectorAll('.nav-view-panel');
+    const viewTitle = document.getElementById('view-title');
+
+    // 2. Core Operational Logic Nodes
     const authModal = document.getElementById('auth-modal');
     const authForm = document.getElementById('auth-form');
     const passwordInput = document.getElementById('password-input');
     const mainApp = document.getElementById('main-app');
-    
+    const lockBtn = document.getElementById('lock-btn');
+
+    // 3. View 1 (Home) Elements
     const memoryForm = document.getElementById('memory-form');
     const memoryInput = document.getElementById('memory-input');
     const formLabel = document.getElementById('form-label');
     const saveBtn = document.getElementById('save-btn');
     const memoriesContainer = document.getElementById('memories-container');
-    const lockBtn = document.getElementById('lock-btn');
 
-    // New Day-wise Inline AI Workspace nodes
-    const dayInsightsWorkspace = document.getElementById('day-insights-workspace');
-    const dayInsightsList = document.getElementById('day-insights-list');
+    // 4. View 2 (Agents Hub) Elements
+    const agentsListContainer = document.getElementById('agents-list-container');
+    const addAgentFab = document.getElementById('add-agent-fab');
+    const createAgentModal = document.getElementById('create-agent-modal');
+    const createAgentForm = document.getElementById('create-agent-form');
+    const newAgentName = document.getElementById('new-agent-name');
+    const newAgentPrompt = document.getElementById('new-agent-prompt');
+    const closeCreateModalBtn = document.getElementById('close-create-modal-btn');
 
-    // AI Global & Profile Configuration Elements
+    // 5. View 3 (Agent Deep Dive Drilldown View) Elements
+    const viewAgentDetail = document.getElementById('view-agent-detail');
+    const agentDetailBackBtn = document.getElementById('agent-detail-back-btn');
+    const agentConfigureToggleBtn = document.getElementById('agent-configure-toggle-btn');
+    const agentConfigPanel = document.getElementById('agent-config-panel');
+    const editAgentName = document.getElementById('edit-agent-name');
+    const editAgentPrompt = document.getElementById('edit-agent-prompt');
+    const saveAgentConfigBtn = document.getElementById('save-agent-config-btn');
+    const deleteAgentBtn = document.getElementById('delete-agent-btn');
+    const activeAgentHeading = document.getElementById('active-agent-heading');
+    const activeAgentPromptPreview = document.getElementById('active-agent-prompt-preview');
+    const batchRunBtn = document.getElementById('batch-run-btn');
+    const batchProgressMsg = document.getElementById('batch-progress-msg');
+    const agentInsightsTimeline = document.getElementById('agent-insights-timeline');
+
+    // 6. View 4 (Settings Architecture Elements)
     const aiEndpointInput = document.getElementById('ai-endpoint');
     const aiModelInput = document.getElementById('ai-model');
-    const saveGlobalAiBtn = document.getElementById('save-global-ai-btn');
-    const profileCreationForm = document.getElementById('profile-creation-form');
-    const newProfileName = document.getElementById('new-profile-name');
-    const newProfilePrompt = document.getElementById('new-profile-prompt');
-    const activeProfilesContainer = document.getElementById('active-profiles-container');
+    const saveSettingsBtn = document.getElementById('save-settings-btn');
+    const exportBtn = document.getElementById('export-btn');
+    const importBtn = document.getElementById('import-btn');
+    const backupIoZone = document.getElementById('backup-io-zone');
+    const backupTextarea = document.getElementById('backup-textarea');
+    const backupActionSubmitBtn = document.getElementById('backup-action-submit-btn');
 
-    // Portability Elements
-    const exportTriggerBtn = document.getElementById('export-trigger-btn');
-    const importTriggerBtn = document.getElementById('import-trigger-btn');
-    const exportPanel = document.getElementById('export-panel');
-    const importPanel = document.getElementById('import-panel');
-    const exportOutput = document.getElementById('export-output');
-    const copyVaultBtn = document.getElementById('copy-vault-btn');
-    const copyStatus = document.getElementById('copy-status');
-    const importInput = document.getElementById('import-input');
-    const submitImportBtn = document.getElementById('submit-import-btn');
-    const importStatus = document.getElementById('import-status');
+    // Volatile State Enclosures
+    let sessionKey = "";
+    let decryptedTimeline = [];
+    let activeAgentProfile = null; // References the active viewing agent item mapping context
+    let currentTargetDateKey = getTodayKey();
 
-    // Volatile Core App State
-    let sessionKey = ""; 
-    let decryptedTimeline = []; 
-    let currentTargetDateKey = getTodayKey(); 
+    // Configuration Core Sets
+    let globalAiConfig = JSON.parse(localStorage.getItem('dayMemoryGlobalAiConfig')) || {
+        endpoint: "http://127.0.0.1:11434", model: "llama3"
+    };
+    let aiProfiles = JSON.parse(localStorage.getItem('dayMemoryAiProfiles')) || [];
 
     function getTodayKey() {
         const d = new Date();
@@ -53,52 +75,42 @@ document.addEventListener('DOMContentLoaded', () => {
         const [year, month, day] = dateString.split('-');
         const dateObj = new Date(year, month - 1, day);
         return dateObj.toLocaleDateString('en-US', {
-            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+            weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
         });
     }
 
-    // --- Analytics Engine Configuration Management Matrix ---
-    let globalAiConfig = JSON.parse(localStorage.getItem('dayMemoryGlobalAiConfig')) || {
-        endpoint: "http://127.0.0.1:11434", model: "llama3"
-    };
-    let aiProfiles = JSON.parse(localStorage.getItem('dayMemoryAiProfiles')) || [];
-
-    function saveGlobalAiCredentials() {
-        globalAiConfig.endpoint = aiEndpointInput.value.trim().replace(/\/$/, "");
-        globalAiConfig.model = aiModelInput.value.trim();
-        localStorage.setItem('dayMemoryGlobalAiConfig', JSON.stringify(globalAiConfig));
-        alert("Global Ollama connection parameters updated.");
-    }
-    saveGlobalAiBtn.addEventListener('click', saveGlobalAiCredentials);
-
-    profileCreationForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const name = newProfileName.value.trim().replace(/[^a-zA-Z0-9]/g, ""); // strip space and punctuation tokens
-        const prompt = newProfilePrompt.value.trim();
-
-        if (aiProfiles.some(p => p.name.toLowerCase() === name.toLowerCase())) {
-            alert("A profile with this identifier name already exists.");
-            return;
-        }
-
-        aiProfiles.push({ name, prompt });
-        localStorage.setItem('dayMemoryAiProfiles', JSON.stringify(aiProfiles));
-        
-        newProfileName.value = "";
-        newProfilePrompt.value = "";
-        renderAiDashboard();
-        if (decryptedTimeline.length > 0) updateFormContext(currentTargetDateKey);
+    // --- Tab-Switching & View Management System (Mobile Routing Engine) ---
+    navItems.forEach(item => {
+        item.addEventListener('click', () => {
+            const targetViewId = item.getAttribute('data-target');
+            switchActiveViewPanel(targetViewId);
+            
+            // Sync highlight tags layout structures
+            navItems.forEach(nav => nav.classList.remove('active'));
+            item.classList.add('active');
+        });
     });
 
-    function deleteAiProfile(profileName) {
-        if (!confirm(`Are you sure you want to delete the "${profileName}" profile? This stops execution capabilities but keeps historical data unchanged.`)) return;
-        aiProfiles = aiProfiles.filter(p => p.name !== profileName);
-        localStorage.setItem('dayMemoryAiProfiles', JSON.stringify(aiProfiles));
-        renderAiDashboard();
-        updateFormContext(currentTargetDateKey);
+    function switchActiveViewPanel(viewId) {
+        viewPanels.forEach(panel => panel.classList.remove('active'));
+        const activePanel = document.getElementById(viewId);
+        activePanel.classList.add('active');
+
+        // Dynamically update view header text content
+        if (viewId === 'view-home') viewTitle.textContent = "Home";
+        else if (viewId === 'view-agents') {
+            viewTitle.textContent = "AI Agents";
+            renderAgentsHub();
+        } else if (viewId === 'view-agent-detail') {
+            viewTitle.textContent = activeAgentProfile ? activeAgentProfile.name : "Agent Tracker";
+        } else if (viewId === 'view-settings') {
+            viewTitle.textContent = "Settings";
+            aiEndpointInput.value = globalAiConfig.endpoint;
+            aiModelInput.value = globalAiConfig.model;
+        }
     }
 
-    // --- Authentication Decryption Interface Blocks ---
+    // --- Auth Encryption Systems ---
     authForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const enteredPassword = passwordInput.value.trim();
@@ -110,15 +122,8 @@ document.addEventListener('DOMContentLoaded', () => {
         authModal.classList.add('visual-hidden');
         mainApp.classList.remove('visual-hidden');
         
-        // Initialize Config Layout Coordinates
-        aiEndpointInput.value = globalAiConfig.endpoint;
-        aiModelInput.value = globalAiConfig.model;
-        
         displayMemories(success);
-        if (success) {
-            renderAiDashboard();
-            updateFormContext(getTodayKey());
-        }
+        if (success) updateFormContext(getTodayKey());
     });
 
     function decryptAndLoadVault() {
@@ -144,94 +149,23 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('dayMemoryVault', ciphertext);
     }
 
-    // --- Expanded Day-Wise Editing Workspace Context Logic ---
+    // --- HOME VIEW LOGIC (Timeline Updates) ---
     function updateFormContext(dateKey) {
         currentTargetDateKey = dateKey;
         const existingEntry = decryptedTimeline.find(item => item.id === dateKey);
         const isToday = (dateKey === getTodayKey());
 
-        // Setup textual base contexts
         if (existingEntry) {
             memoryInput.value = existingEntry.text;
-            formLabel.textContent = isToday ? `Editing today's reflection (${formatReadableDate(dateKey)}):` : `Editing historical record for ${formatReadableDate(dateKey)}:`;
-            saveBtn.textContent = "Update Memory";
-            
-            // Build the day-wise explicit inner matrix dashboard summary edit zones
-            renderDayInsightsWorkspace(existingEntry);
+            formLabel.textContent = isToday ? `Editing Today (${formatReadableDate(dateKey)}):` : `Editing Entry for ${formatReadableDate(dateKey)}:`;
+            saveBtn.textContent = "Update Entry";
         } else {
             memoryInput.value = "";
-            dayInsightsWorkspace.classList.add('visual-hidden');
-            formLabel.textContent = `Write about today (${formatReadableDate(dateKey)}):`;
-            saveBtn.textContent = "Save New Memory";
+            formLabel.textContent = `Write about Today (${formatReadableDate(dateKey)}):`;
+            saveBtn.textContent = "Save Reflection";
         }
     }
 
-    function renderDayInsightsWorkspace(entry) {
-        dayInsightsList.innerHTML = "";
-        
-        if (aiProfiles.length === 0) {
-            dayInsightsWorkspace.classList.add('visual-hidden');
-            return;
-        }
-        
-        dayInsightsWorkspace.classList.remove('visual-hidden');
-        if (!entry.aiInsights) entry.aiInsights = {};
-
-        aiProfiles.forEach(profile => {
-            const row = document.createElement('div');
-            row.className = 'day-insight-row-item';
-
-            const meta = document.createElement('div');
-            meta.className = 'day-insight-meta';
-            
-            const label = document.createElement('div');
-            label.className = 'day-insight-label';
-            label.textContent = `Agent profile: ${profile.name}`;
-
-            const tray = document.createElement('div');
-            tray.className = 'agent-control-tray';
-
-            const runBtn = document.createElement('button');
-            runBtn.type = "button";
-            runBtn.className = "edit-action-btn";
-            runBtn.textContent = entry.aiInsights[profile.name] ? "🔄 Re-Analyze" : "✨ Analyze";
-            
-            runBtn.addEventListener('click', async () => {
-                runBtn.disabled = true;
-                runBtn.textContent = "Processing...";
-                const result = await fetchOllamaGeneration(profile.prompt, entry.text);
-                if (result) {
-                    entry.aiInsights[profile.name] = result;
-                    encryptAndSaveVault();
-                    renderDayInsightsWorkspace(entry);
-                } else {
-                    runBtn.disabled = false;
-                    runBtn.textContent = "Retry Failed";
-                }
-            });
-
-            tray.appendChild(runBtn);
-            meta.appendChild(label);
-            meta.appendChild(tray);
-
-            const textarea = document.createElement('textarea');
-            textarea.className = 'day-insight-body-text';
-            textarea.value = entry.aiInsights[profile.name] || "[No analysis ran for this custom profile yet.]";
-            textarea.placeholder = "Analysis metadata content...";
-            
-            // Enable manual inline modification syncing directly back to state variables
-            textarea.addEventListener('input', () => {
-                entry.aiInsights[profile.name] = textarea.value.trim() || null;
-                encryptAndSaveVault(); 
-            });
-
-            row.appendChild(meta);
-            row.appendChild(textarea);
-            dayInsightsList.appendChild(row);
-        });
-    }
-
-    // Manual Form Submission Core Actions
     memoryForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const text = memoryInput.value.trim();
@@ -255,216 +189,266 @@ document.addEventListener('DOMContentLoaded', () => {
         updateFormContext(getTodayKey());
     });
 
-    // --- Core Low-level Ollama API Fetcher Pipeline ---
-    async function fetchOllamaGeneration(systemPrompt, journalText) {
+    function displayMemories(isSuccess) {
+        memoriesContainer.innerHTML = '';
+        if (!isSuccess) {
+            memoriesContainer.innerHTML = `<div class="panel-box" style="border-left:4px solid var(--danger); font-style:italic;">[Incorrect password or corrupted data framework.]</div>`;
+            return;
+        }
+        if (decryptedTimeline.length === 0) {
+            memoriesContainer.innerHTML = `<p class="status-msg">Your vault is clean. Write down your first memory above!</p>`;
+            return;
+        }
+
+        decryptedTimeline.forEach(memory => {
+            const card = document.createElement('div');
+            card.className = 'memory-card';
+            card.innerHTML = `
+                <div class="memory-card-header">
+                    <div>${memory.readableDate}</div>
+                    <button class="text-link-btn edit-entry-trigger">Edit</button>
+                </div>
+                <div class="memory-text">${memory.text}</div>
+            `;
+            card.querySelector('.edit-entry-trigger').addEventListener('click', () => {
+                updateFormContext(memory.id);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+            memoriesContainer.appendChild(card);
+        });
+    }
+
+    // --- AGENTS LANDING PAGE VIEW MANAGEMENT ---
+    function renderAgentsHub() {
+        agentsListContainer.innerHTML = "";
+        if (aiProfiles.length === 0) {
+            agentsListContainer.innerHTML = "<p class='status-msg'>No operational analytical profiles. Hit the + FAB button to instantiate one!</p>";
+            return;
+        }
+
+        aiProfiles.forEach(profile => {
+            const card = document.createElement('div');
+            card.className = 'agent-row-card';
+            card.innerHTML = `
+                <div>
+                    <div class="agent-row-title">${profile.name}</div>
+                    <p style="font-size:0.8rem; color:var(--text-muted); max-width:220px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${profile.prompt}</p>
+                </div>
+                <button class="secondary-btn open-agent-btn" style="width:auto; padding:0.4rem 0.8rem; font-size:0.85rem;">Open →</button>
+            `;
+            card.querySelector('.open-agent-btn').addEventListener('click', () => {
+                openAgentSubProfileView(profile);
+            });
+            agentsListContainer.appendChild(card);
+        });
+    }
+
+    addAgentFab.addEventListener('click', () => createAgentModal.classList.remove('visual-hidden'));
+    closeCreateModalBtn.addEventListener('click', () => createAgentModal.classList.add('visual-hidden'));
+
+    createAgentForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const name = newAgentName.value.trim().replace(/[^a-zA-Z0-9]/g, "");
+        const prompt = newAgentPrompt.value.trim();
+
+        if (aiProfiles.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+            alert("An identical profile moniker exists.");
+            return;
+        }
+
+        aiProfiles.push({ name, prompt });
+        localStorage.setItem('dayMemoryAiProfiles', JSON.stringify(aiProfiles));
+        
+        newAgentName.value = "";
+        newAgentPrompt.value = "";
+        createAgentModal.classList.add('visual-hidden');
+        renderAgentsHub();
+    });
+
+    // --- NESTED AGENT SUB-PAGE TRACKER VIEW ---
+    function openAgentSubProfileView(profile) {
+        activeAgentProfile = profile;
+        agentConfigPanel.classList.add('visual-hidden'); // ensure config settings block resets shut
+        switchActiveViewPanel('view-agent-detail');
+
+        activeAgentHeading.textContent = profile.name;
+        activeAgentPromptPreview.textContent = `Prompt: "${profile.prompt}"`;
+        
+        editAgentName.value = profile.name;
+        editAgentPrompt.value = profile.prompt;
+
+        renderAgentInsightsTimelineList();
+    }
+
+    agentDetailBackBtn.addEventListener('click', () => {
+        activeAgentProfile = null;
+        switchActiveViewPanel('view-agents');
+    });
+
+    agentConfigureToggleBtn.addEventListener('click', () => {
+        agentConfigPanel.classList.toggle('visual-hidden');
+    });
+
+    // Inline configuration updates logic
+    saveAgentConfigBtn.addEventListener('click', () => {
+        if (!activeAgentProfile) return;
+        const newName = editAgentName.value.trim().replace(/[^a-zA-Z0-9]/g, "");
+        const newPrompt = editAgentPrompt.value.trim();
+
+        if (!newName || !newPrompt) return;
+
+        // Migrates historical references if renaming occurred
+        if (newName !== activeAgentProfile.name) {
+            decryptedTimeline.forEach(entry => {
+                if (entry.aiInsights && entry.aiInsights[activeAgentProfile.name]) {
+                    entry.aiInsights[newName] = entry.aiInsights[activeAgentProfile.name];
+                    delete entry.aiInsights[activeAgentProfile.name];
+                }
+            });
+            encryptAndSaveVault();
+        }
+
+        const idx = aiProfiles.findIndex(p => p.name === activeAgentProfile.name);
+        aiProfiles[idx] = { name: newName, prompt: newPrompt };
+        localStorage.setItem('dayMemoryAiProfiles', JSON.stringify(aiProfiles));
+        
+        activeAgentProfile = aiProfiles[idx];
+        openAgentSubProfileView(activeAgentProfile);
+        alert("Agent configuration array modified.");
+    });
+
+    deleteAgentBtn.addEventListener('click', () => {
+        if (!activeAgentProfile || !confirm(`Delete all profile criteria definitions for agent: ${activeAgentProfile.name}? Historic generations data properties will remain conserved.`)) return;
+        
+        aiProfiles = aiProfiles.filter(p => p.name !== activeAgentProfile.name);
+        localStorage.setItem('dayMemoryAiProfiles', JSON.stringify(aiProfiles));
+        
+        activeAgentProfile = null;
+        switchActiveViewPanel('view-agents');
+    });
+
+    // Render detailed rows per-day insights
+    function renderAgentInsightsTimelineList() {
+        agentInsightsTimeline.innerHTML = "";
+        if (decryptedTimeline.length === 0) {
+            agentInsightsTimeline.innerHTML = "<p class='status-msg'>Timeline history blank.</p>";
+            return;
+        }
+
+        decryptedTimeline.forEach(entry => {
+            const row = document.createElement('div');
+            row.className = 'panel-box';
+            
+            if (!entry.aiInsights) entry.aiInsights = {};
+            const insightText = entry.aiInsights[activeAgentProfile.name] || "";
+
+            row.innerHTML = `
+                <div class="memory-card-header">
+                    <div>${entry.readableDate}</div>
+                    <button class="text-link-btn single-day-run-trigger">${insightText ? '🔄 Re-Analyze' : '✨ Analyze Day'}</button>
+                </div>
+                <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:0.5rem; background:rgba(0,0,0,0.02); padding:0.4rem; border-radius:4px;">Log: "${entry.text}"</div>
+                <textarea class="agent-insight-edit-box" placeholder="No insight output logged. Click 'Analyze' to query model...">${insightText}</textarea>
+            `;
+
+            // Setup real-time blur/input manual editing mechanics per textarea line
+            const tx = row.querySelector('.agent-insight-edit-box');
+            tx.addEventListener('input', () => {
+                entry.aiInsights[activeAgentProfile.name] = tx.value.trim() || null;
+                encryptAndSaveVault();
+            });
+
+            row.querySelector('.single-day-run-trigger').addEventListener('click', async (e) => {
+                e.target.disabled = true;
+                e.target.textContent = "Querying Local LLM...";
+                const res = await callOllamaPipeline(activeAgentProfile.prompt, entry.text);
+                if (res) {
+                    entry.aiInsights[activeAgentProfile.name] = res;
+                    encryptAndSaveVault();
+                    renderAgentInsightsTimelineList();
+                } else {
+                    e.target.disabled = false;
+                    e.target.textContent = "Run Failed - Retry";
+                }
+            });
+
+            agentInsightsTimeline.appendChild(row);
+        });
+    }
+
+    // --- BATCH PARSING DRIVER ENGINE ---
+    async function callOllamaPipeline(systemPrompt, userText) {
         try {
             const response = await fetch(`${globalAiConfig.endpoint}/api/generate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     model: globalAiConfig.model,
-                    prompt: `System Assignment Protocol: ${systemPrompt}\n\nJournal Narrative Data block:\n"${journalText}"`,
+                    prompt: `System Prompt Instructions: ${systemPrompt}\n\nJournal entry context content:\n"${userText}"`,
                     stream: false
                 })
             });
             if (!response.ok) throw new Error();
             const data = await response.json();
             return data.response.trim();
-        } catch (e) {
-            alert(`Ollama execution broken. Verify CORS connection configurations at endpoint url address: ${globalAiConfig.endpoint}`);
+        } catch (err) {
+            alert(`Network connectivity dropped to Ollama API environment configuration path at: ${globalAiConfig.endpoint}. Double check CORS parameters.`);
             return null;
         }
     }
 
-    // --- Global Batch Timeline Iteration Processor ("Analyze All Pages") ---
-    async function runBatchProfileAnalysis(profile) {
-        if (decryptedTimeline.length === 0) {
-            alert("Your entry history timeline is completely blank. Nothing to parse.");
-            return;
-        }
+    batchRunBtn.addEventListener('click', async () => {
+        if (decryptedTimeline.length === 0 || !activeAgentProfile) return;
+        if (!confirm(`Initialize asynchronous batch sequencing through all ${decryptedTimeline.length} history slots?`)) return;
 
-        if (!confirm(`This will trigger sequentially ordered queries through all ${decryptedTimeline.length} entries inside your log using your local machine model capabilities. Proceed?`)) return;
-
-        const statusIndicator = document.getElementById(`batch-status-${profile.name}`);
+        batchRunBtn.disabled = true;
         
         for (let i = 0; i < decryptedTimeline.length; i++) {
             const entry = decryptedTimeline[i];
-            statusIndicator.textContent = `⏳ Scanning entry ${i + 1}/${decryptedTimeline.length} (${entry.id})...`;
+            batchProgressMsg.textContent = `⏳ Processing: ${i + 1}/${decryptedTimeline.length} (${entry.id})...`;
             
             if (!entry.aiInsights) entry.aiInsights = {};
 
-            const result = await fetchOllamaGeneration(profile.prompt, entry.text);
-            if (result) {
-                entry.aiInsights[profile.name] = result;
-                encryptAndSaveVault(); // Progress saved incrementally per node block iteration
-            } else {
-                if (!confirm("Ollama pipeline request dropped mid-batch processing loop. Skip this node step and continue processing remaining history records?")) {
-                    statusIndicator.textContent = "❌ Processing tracking aborted.";
-                    if (currentTargetDateKey === entry.id) updateFormContext(entry.id);
-                    return;
-                }
+            const out = await callOllamaPipeline(activeAgentProfile.prompt, entry.text);
+            if (out) {
+                entry.aiInsights[activeAgentProfile.name] = out;
+                encryptAndSaveVault();
             }
         }
 
-        statusIndicator.textContent = "✅ Batch run completed successfully!";
-        setTimeout(() => { statusIndicator.textContent = ""; }, 5000);
-        
-        // Sync working workspace states
-        updateFormContext(currentTargetDateKey);
-    }
-
-    // --- Dynamic AI Dashboard Control Renderer ---
-    function renderAiDashboard() {
-        activeProfilesContainer.innerHTML = "";
-        
-        if (aiProfiles.length === 0) {
-            activeProfilesContainer.innerHTML = "<p class='no-memories'>No operational analysis agents running. Create one above!</p>";
-            return;
-        }
-
-        aiProfiles.forEach(profile => {
-            const card = document.createElement('div');
-            card.className = "profile-agent-card";
-
-            const header = document.createElement('div');
-            header.className = "profile-header-wrapper";
-
-            const title = document.createElement('div');
-            title.className = "profile-title-tag";
-            title.textContent = `Agent: ${profile.name}`;
-
-            const delBtn = document.createElement('button');
-            delBtn.className = "delete-profile-btn";
-            delBtn.textContent = "Remove Profile";
-            delBtn.addEventListener('click', () => deleteAiProfile(profile.name));
-
-            header.appendChild(title);
-            header.appendChild(delBtn);
-
-            const promptPre = document.createElement('div');
-            promptPre.className = "profile-prompt-preview";
-            promptPre.textContent = `System Prompt: ${profile.prompt}`;
-
-            const tray = document.createElement('div');
-            tray.className = "agent-control-tray";
-
-            const batchBtn = document.createElement('button');
-            batchBtn.className = "secondary-btn";
-            batchBtn.style.borderColor = "var(--accent)";
-            batchBtn.textContent = "🚀 Run Batch Analysis (All Pages)";
-            batchBtn.addEventListener('click', () => runBatchProfileAnalysis(profile));
-
-            const statusSpan = document.createElement('span');
-            statusSpan.id = `batch-status-${profile.name}`;
-            statusSpan.className = "status-msg";
-            statusSpan.style.color = "var(--accent)";
-
-            tray.appendChild(batchBtn);
-            tray.appendChild(statusSpan);
-
-            card.appendChild(header);
-            card.appendChild(promptPre);
-            card.appendChild(tray);
-
-            activeProfilesContainer.appendChild(card);
-        });
-    }
-
-    // --- Render Core Scannable Timelines (Clean Layout Mode) ---
-    function displayMemories(isSuccessfullyDecrypted) {
-        memoriesContainer.innerHTML = '';
-
-        if (!isSuccessfullyDecrypted) {
-            const errorCard = document.createElement('div');
-            errorCard.className = 'memory-card';
-            errorCard.style.borderLeft = '4px solid #ef4444';
-            errorCard.style.color = 'var(--text-muted)';
-            errorCard.style.fontStyle = 'italic';
-            errorCard.textContent = "[Undecipherable vault state context. Verification token missing.]";
-            memoriesContainer.appendChild(errorCard);
-            
-            memoryInput.disabled = true;
-            saveBtn.disabled = true;
-            document.querySelector('.backup-section').style.display = 'none';
-            document.querySelector('.ai-dashboard-section').style.display = 'none';
-            return;
-        }
-
-        document.querySelector('.backup-section').style.display = 'block';
-        document.querySelector('.ai-dashboard-section').style.display = 'block';
-        memoryInput.disabled = false;
-        saveBtn.disabled = false;
-
-        if (decryptedTimeline.length === 0) {
-            memoriesContainer.innerHTML = '<p class="no-memories">Timeline empty.</p>';
-            return;
-        }
-
-        decryptedTimeline.forEach((memory) => {
-            const card = document.createElement('div');
-            card.className = 'memory-card';
-
-            const cardHeader = document.createElement('div');
-            cardHeader.className = 'memory-card-header';
-
-            const dateDiv = document.createElement('div');
-            dateDiv.className = 'memory-date';
-            dateDiv.textContent = memory.readableDate;
-
-            const editBtn = document.createElement('button');
-            editBtn.className = 'edit-action-btn';
-            editBtn.textContent = "Edit";
-            editBtn.addEventListener('click', () => {
-                updateFormContext(memory.id);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            });
-
-            cardHeader.appendChild(dateDiv);
-            cardHeader.appendChild(editBtn);
-
-            const textDiv = document.createElement('div');
-            textDiv.className = 'memory-text';
-            textDiv.textContent = memory.text;
-
-            card.appendChild(cardHeader);
-            card.appendChild(textDiv);
-            memoriesContainer.appendChild(card);
-        });
-    }
-
-    // --- Backup Operations Pipeline Layouts ---
-    exportTriggerBtn.addEventListener('click', () => {
-        importPanel.classList.add('visual-hidden');
-        exportPanel.classList.toggle('visual-hidden');
-        if (!exportPanel.classList.contains('visual-hidden')) {
-            exportOutput.value = localStorage.getItem('dayMemoryVault') || "";
-            exportOutput.select();
-        }
+        batchProgressMsg.textContent = "✅ Batch computation completed.";
+        batchRunBtn.disabled = false;
+        renderAgentInsightsTimelineList();
+        setTimeout(() => { batchProgressMsg.textContent = ""; }, 5000);
     });
 
-    importTriggerBtn.addEventListener('click', () => {
-        exportPanel.classList.add('visual-hidden');
-        importPanel.classList.toggle('visual-hidden');
-        importInput.value = "";
+    // --- VIEW 4 SETTINGS & CORE BACKUP FUNCTIONS ---
+    saveSettingsBtn.addEventListener('click', () => {
+        globalAiConfig.endpoint = aiEndpointInput.value.trim().replace(/\/$/, "");
+        globalAiConfig.model = aiModelInput.value.trim();
+        localStorage.setItem('dayMemoryGlobalAiConfig', JSON.stringify(globalAiConfig));
+        alert("Global core settings mapped.");
     });
 
-    copyVaultBtn.addEventListener('click', () => {
-        if (!exportOutput.value) return;
-        navigator.clipboard.writeText(exportOutput.value).then(() => {
-            copyStatus.textContent = "Copied successfully!";
-            setTimeout(() => { copyStatus.textContent = ""; }, 3000);
-        });
+    exportBtn.addEventListener('click', () => {
+        backupIoZone.classList.remove('visual-hidden');
+        backupTextarea.value = localStorage.getItem('dayMemoryVault') || "";
+        backupTextarea.select();
     });
 
-    submitImportBtn.addEventListener('click', () => {
-        const importedString = importInput.value.trim();
-        if (!importedString) return;
-        localStorage.setItem('dayMemoryVault', importedString);
-        alert("Encrypted vault string imported successfully! Reloading environment...");
+    importBtn.addEventListener('click', () => {
+        backupIoZone.classList.remove('visual-hidden');
+        backupTextarea.value = "";
+        backupTextarea.placeholder = "Paste raw encrypted string structure blocks here...";
+    });
+
+    backupActionSubmitBtn.addEventListener('click', () => {
+        const str = backupTextarea.value.trim();
+        if (!str) return;
+        localStorage.setItem('dayMemoryVault', str);
+        alert("Cipher text structural adjustments written. App environment will refresh now.");
         window.location.reload();
     });
 
-    lockBtn.addEventListener('click', () => {
-        window.location.reload(); 
-    });
+    lockBtn.addEventListener('click', () => window.location.reload());
 });

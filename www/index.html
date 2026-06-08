@@ -2,107 +2,161 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DayMemory (Multi-AI Vault)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>DayMemory AI</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 </head>
 <body>
+
+    <!-- 0. Auth Guard Modal -->
     <div id="auth-modal" class="modal-overlay">
         <div class="modal-content">
-            <h2 id="modal-title">Unlock Your Vault</h2>
-            <p id="modal-desc">Enter your password to decrypt your zero-knowledge timeline state.</p>
+            <h2>Unlock Vault</h2>
+            <p>Your timeline remains zero-knowledge encrypted locally.</p>
             <form id="auth-form">
-                <input type="password" id="password-input" placeholder="Enter your master password" required autocomplete="off">
-                <button type="submit" id="modal-submit-btn">Unlock Vault</button>
+                <input type="password" id="password-input" placeholder="Master Password" required autocomplete="off">
+                <button type="submit">Unlock</button>
             </form>
         </div>
     </div>
 
-    <div class="app-container visual-hidden" id="main-app">
-        <header>
-            <h1>DayMemory</h1>
-            <p>Your zero-knowledge, multi-agent AI journal.</p>
-            <div class="header-controls">
-                <button id="lock-btn" class="secondary-btn">🔒 Lock App</button>
-            </div>
+    <!-- Main View Frame -->
+    <div id="main-app" class="app-container visual-hidden">
+        
+        <!-- App Header Bar -->
+        <header class="app-header">
+            <h1 id="view-title">Home</h1>
+            <button id="lock-btn" class="icon-btn" title="Lock Vault">🔒</button>
         </header>
 
-        <main>
-            <form id="memory-form">
-                <div class="input-group">
-                    <label id="form-label" for="memory-input">Write about today:</label>
-                    <textarea id="memory-input" placeholder="Write your description here..." required></textarea>
-                </div>
-                
-                <div id="day-insights-workspace" class="panel-box visual-hidden">
-                    <label>Day-Wise AI Analyses Tracker:</label>
-                    <div id="day-insights-list"></div>
-                </div>
+        <!-- View Panels Wrapper -->
+        <div class="view-content-wrapper">
+            
+            <!-- VIEW 1: HOME VIEW -->
+            <section id="view-home" class="nav-view-panel active">
+                <form id="memory-form" class="editor-card">
+                    <label id="form-label" for="memory-input">Today's Reflection:</label>
+                    <textarea id="memory-input" placeholder="How was your day? Write your thoughts..." required></textarea>
+                    <button type="submit" id="save-btn">Save Reflection</button>
+                </form>
 
-                <button type="submit" id="save-btn">Save Memory</button> 
-            </form>
-
-            <section class="memories-section">
-                <h2>Your Secure Timeline</h2>
+                <div class="section-title">Timeline History</div>
                 <div id="memories-container"></div>
             </section>
 
-            <hr class="section-divider">
-            <section class="ai-dashboard-section">
-                <h2>🤖 Multi-AI Analytics Profiles</h2>
-                <p class="section-desc">Create distinct analysis agents. Each profile can scan your entire journal timeline using its own specialized system prompt.</p>
-
-                <div class="config-row">
-                    <div class="input-group-inline">
-                        <label for="ai-endpoint">Ollama Endpoint:</label>
-                        <input type="url" id="ai-endpoint" placeholder="http://127.0.0.1:11434" required>
-                    </div>
-                    <div class="input-group-inline">
-                        <label for="ai-model">Model Name:</label>
-                        <input type="text" id="ai-model" placeholder="llama3" required>
-                    </div>
-                    <button id="save-global-ai-btn" class="secondary-btn">Save Server Credentials</button>
-                </div>
-
-                <form id="profile-creation-form" class="panel-box">
-                    <label>Create New Analytics Profile Agent</label>
-                    <div class="profile-input-grid">
-                        <input type="text" id="new-profile-name" placeholder="Profile Name (e.g., MoodTracker, Summary, Habits)" required>
-                        <textarea id="new-profile-prompt" placeholder="Provide distinct analytical processing instructions for the AI agent..." required></textarea>
-                    </div>
-                    <button type="submit" style="margin-top: 0.5rem;">Add Profile Agent</button>
-                </form>
-
-                <div id="active-profiles-container"></div>
+            <!-- VIEW 2: AGENTS MASTER VIEW -->
+            <section id="view-agents" class="nav-view-panel">
+                <div class="section-title">Your AI Insights Agents</div>
+                <div id="agents-list-container"></div>
+                <button id="add-agent-fab" class="fab-btn" title="Add New Agent">+</button>
             </section>
 
-            <hr class="section-divider">
-            <section class="backup-section">
-                <h3>Vault Portability & Backups</h3>
-                <p class="section-desc">Export your single encrypted data string to back it up, or import an existing data string from another backup.</p>
-                
-                <div class="backup-actions">
-                    <button id="export-trigger-btn" class="secondary-btn">Export Vault String</button>
-                    <button id="import-trigger-btn" class="secondary-btn">Import Vault String</button>
+            <!-- VIEW 3: AGENT DETAILS LAYER VIEW (Drill Down) -->
+            <section id="view-agent-detail" class="nav-view-panel">
+                <div class="back-bar">
+                    <button id="agent-detail-back-btn" class="text-link-btn">← Back to Agents</button>
+                    <button id="agent-configure-toggle-btn" class="text-link-btn">Configure Agent ⚙️</button>
                 </div>
 
-                <div id="export-panel" class="panel-box visual-hidden">
-                    <label for="export-output">Your Encrypted Vault String:</label>
-                    <textarea id="export-output" readonly></textarea>
-                    <button id="copy-vault-btn">Copy to Clipboard</button>
-                    <span id="copy-status" class="status-msg"></span>
+                <!-- Live Configuration Dropdown Grid -->
+                <div id="agent-config-panel" class="panel-box visual-hidden">
+                    <div class="input-group">
+                        <label>Agent Name</label>
+                        <input type="text" id="edit-agent-name">
+                    </div>
+                    <div class="input-group">
+                        <label>System Evaluation Prompt</label>
+                        <textarea id="edit-agent-prompt"></textarea>
+                    </div>
+                    <div class="config-actions-row">
+                        <button id="save-agent-config-btn">Save Changes</button>
+                        <button id="delete-agent-btn" class="danger-btn">Delete Agent</button>
+                    </div>
                 </div>
 
-                <div id="import-panel" class="panel-box visual-hidden">
-                    <label for="import-input">Paste Encrypted Vault String:</label>
-                    <textarea id="import-input" placeholder="Paste encrypted string here..."></textarea>
-                    <button id="submit-import-btn" class="danger-btn">Overwrite & Restore Timeline</button>
-                    <span id="import-status" class="status-msg text-danger"></span>
+                <div class="batch-action-banner">
+                    <div id="agent-detail-meta">
+                        <h3 id="active-agent-heading">Agent Name</h3>
+                        <p id="active-agent-prompt-preview"></p>
+                    </div>
+                    <button id="batch-run-btn" class="secondary-btn">🚀 Run Batch Analytics (All Days)</button>
+                    <div id="batch-progress-msg" class="status-msg"></div>
+                </div>
+
+                <div class="section-title">Insight Records</div>
+                <div id="agent-insights-timeline"></div>
+            </section>
+
+            <!-- VIEW 4: SETTINGS VIEW -->
+            <section id="view-settings" class="nav-view-panel">
+                <div class="section-title">Ollama Engine Parameters</div>
+                <div class="panel-box">
+                    <div class="input-group">
+                        <label for="ai-endpoint">Ollama Endpoint URL</label>
+                        <input type="url" id="ai-endpoint" placeholder="http://10.0.2.2:11434 or http://127.0.0.1:11434">
+                    </div>
+                    <div class="input-group">
+                        <label for="ai-model">Target Model Name</label>
+                        <input type="text" id="ai-model" placeholder="llama3">
+                    </div>
+                    <button id="save-settings-btn">Save Configurations</button>
+                </div>
+
+                <div class="section-title">Data Administration</div>
+                <div class="panel-box">
+                    <p class="section-desc">Manage encrypted vault string backups directly.</p>
+                    <div class="backup-actions">
+                        <button id="export-btn" class="secondary-btn">Export Vault String</button>
+                        <button id="import-btn" class="secondary-btn">Import Vault String</button>
+                    </div>
+                    <div id="backup-io-zone" class="visual-hidden">
+                        <textarea id="backup-textarea" placeholder="Paste data array string here for restoration..."></textarea>
+                        <button id="backup-action-submit-btn">Execute Backup Change</button>
+                    </div>
                 </div>
             </section>
-        </main>
+
+        </div>
+
+        <!-- Sticky Mobile Bottom Navigation Bar Menu -->
+        <nav class="bottom-nav">
+            <button class="nav-item active" data-target="view-home">
+                <span class="nav-icon">🏠</span>
+                <span class="nav-label">Home</span>
+            </button>
+            <button class="nav-item" data-target="view-agents">
+                <span class="nav-icon">🤖</span>
+                <span class="nav-label">Agents</span>
+            </button>
+            <button class="nav-item" data-target="view-settings">
+                <span class="nav-icon">⚙️</span>
+                <span class="nav-label">Settings</span>
+            </button>
+        </nav>
     </div>
+
+    <!-- Create Agent Popup Sheet Overlay Layer -->
+    <div id="create-agent-modal" class="modal-overlay visual-hidden">
+        <div class="modal-content">
+            <h2>New Agent Profile</h2>
+            <form id="create-agent-form">
+                <div class="input-group">
+                    <label for="new-agent-name">Agent Name</label>
+                    <input type="text" id="new-agent-name" placeholder="e.g., MoodTracker, Summary" required>
+                </div>
+                <div class="input-group">
+                    <label for="new-agent-prompt">System Prompt Rules</label>
+                    <textarea id="new-agent-prompt" placeholder="Instruct the LLM what data points to parse..." required></textarea>
+                </div>
+                <div class="config-actions-row">
+                    <button type="submit">Create Agent</button>
+                    <button type="button" id="close-create-modal-btn" class="secondary-btn">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="script.js"></script>
 </body>
 </html>
