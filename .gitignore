@@ -1,2 +1,16 @@
 
 www/temp
+node_modules/
+android/.gradle
+android/build
+android/app/build
+android/.idea
+android/local.properties
+android/*.keystore
+android/*.jks
+dist/
+build/
+.DS_Store
+*.log
+/android/app
+/android

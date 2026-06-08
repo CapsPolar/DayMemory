@@ -1,0 +1,25 @@
+{
+  "name": "daymemory-app",
+  "version": "1.0.0",
+  "description": "DayMemory AI - A zero-knowledge encrypted timeline app",
+  "main": "index.js",
+  "scripts": {
+    "dev": "http-server www -p 8000 -c-1",
+    "build": "npm run sync",
+    "sync": "cap sync",
+    "build:android": "npm run sync && cd android && ./gradlew assembleDebug",
+    "build:android:release": "npm run sync && cd android && ./gradlew assembleRelease",
+    "open:android": "cap open android",
+    "android:run": "npm run sync && cap run android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/app": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/keyboard": "^6.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.4.0",
+    "http-server": "^14.1.1"
+  }
+}
