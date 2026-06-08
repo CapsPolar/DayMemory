@@ -42,6 +42,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const batchProgressMsg = document.getElementById('batch-progress-msg');
     const agentInsightsTimeline = document.getElementById('agent-insights-timeline');
 
+    // CSV Target Elements
+    const csvHeadersInput = document.getElementById('csv-headers-input');
+    const generateCsvBtn = document.getElementById('generate-csv-btn');
+    const csvOutputZone = document.getElementById('csv-output-zone');
+    const csvTextarea = document.getElementById('csv-textarea');
+    const copyCsvBtn = document.getElementById('copy-csv-btn');
+    const csvCopyStatus = document.getElementById('csv-copy-status');
+
     // 6. View 4 (Settings Architecture Elements)
     const aiEndpointInput = document.getElementById('ai-endpoint');
     const aiModelInput = document.getElementById('ai-model');
@@ -51,12 +59,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const backupIoZone = document.getElementById('backup-io-zone');
     const backupTextarea = document.getElementById('backup-textarea');
     const backupActionSubmitBtn = document.getElementById('backup-action-submit-btn');
+    const backupStatusMsg = document.getElementById('backup-status-msg');
 
     // Volatile State Enclosures
     let sessionKey = "";
     let decryptedTimeline = [];
-    let activeAgentProfile = null; // References the active viewing agent item mapping context
+    let activeAgentProfile = null; 
     let currentTargetDateKey = getTodayKey();
+    let backupMode = "export"; // Tracking interface state: 'export' | 'import'
 
     // Configuration Core Sets
     let globalAiConfig = JSON.parse(localStorage.getItem('dayMemoryGlobalAiConfig')) || {
@@ -85,7 +95,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const targetViewId = item.getAttribute('data-target');
             switchActiveViewPanel(targetViewId);
             
-            // Sync highlight tags layout structures
             navItems.forEach(nav => nav.classList.remove('active'));
             item.classList.add('active');
         });
@@ -96,7 +105,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const activePanel = document.getElementById(viewId);
         activePanel.classList.add('active');
 
-        // Dynamically update view header text content
         if (viewId === 'view-home') viewTitle.textContent = "Home";
         else if (viewId === 'view-agents') {
             viewTitle.textContent = "AI Agents";
@@ -268,7 +276,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- NESTED AGENT SUB-PAGE TRACKER VIEW ---
     function openAgentSubProfileView(profile) {
         activeAgentProfile = profile;
-        agentConfigPanel.classList.add('visual-hidden'); // ensure config settings block resets shut
+        agentConfigPanel.classList.add('visual-hidden'); 
+        csvOutputZone.classList.add('visual-hidden'); // Reset CSV output state container
         switchActiveViewPanel('view-agent-detail');
 
         activeAgentHeading.textContent = profile.name;
@@ -289,7 +298,6 @@ document.addEventListener('DOMContentLoaded', () => {
         agentConfigPanel.classList.toggle('visual-hidden');
     });
 
-    // Inline configuration updates logic
     saveAgentConfigBtn.addEventListener('click', () => {
         if (!activeAgentProfile) return;
         const newName = editAgentName.value.trim().replace(/[^a-zA-Z0-9]/g, "");
@@ -297,7 +305,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!newName || !newPrompt) return;
 
-        // Migrates historical references if renaming occurred
         if (newName !== activeAgentProfile.name) {
             decryptedTimeline.forEach(entry => {
                 if (entry.aiInsights && entry.aiInsights[activeAgentProfile.name]) {
@@ -314,7 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         activeAgentProfile = aiProfiles[idx];
         openAgentSubProfileView(activeAgentProfile);
-        alert("Agent configuration array modified.");
+        alert("Agent configuration modified successfully.");
     });
 
     deleteAgentBtn.addEventListener('click', () => {
@@ -327,7 +334,6 @@ document.addEventListener('DOMContentLoaded', () => {
         switchActiveViewPanel('view-agents');
     });
 
-    // Render detailed rows per-day insights
     function renderAgentInsightsTimelineList() {
         agentInsightsTimeline.innerHTML = "";
         if (decryptedTimeline.length === 0) {
@@ -351,7 +357,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 <textarea class="agent-insight-edit-box" placeholder="No insight output logged. Click 'Analyze' to query model...">${insightText}</textarea>
             `;
 
-            // Setup real-time blur/input manual editing mechanics per textarea line
             const tx = row.querySelector('.agent-insight-edit-box');
             tx.addEventListener('input', () => {
                 entry.aiInsights[activeAgentProfile.name] = tx.value.trim() || null;
@@ -376,7 +381,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- BATCH PARSING DRIVER ENGINE ---
+    // --- OLLAMA API CORRECTIONS & DRIVER ---
     async function callOllamaPipeline(systemPrompt, userText) {
         try {
             const response = await fetch(`${globalAiConfig.endpoint}/api/generate`, {
@@ -422,32 +427,99 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => { batchProgressMsg.textContent = ""; }, 5000);
     });
 
-    // --- VIEW 4 SETTINGS & CORE BACKUP FUNCTIONS ---
+    // --- CSV MULTI-ROW ESCAPED DATA GENERATOR ENGINE ---
+    function escapeCsvCell(text) {
+        if (text === null || text === undefined) return '""';
+        let stringValue = String(text);
+        if (stringValue.includes('"') || stringValue.includes(',') || stringValue.includes('\n') || stringValue.includes('\r')) {
+            return '"' + stringValue.replace(/"/g, '""') + '"';
+        }
+        return stringValue;
+    }
+
+    generateCsvBtn.addEventListener('click', () => {
+        if (!activeAgentProfile || decryptedTimeline.length === 0) return;
+
+        const baseHeaders = csvHeadersInput.value.trim();
+        if (!baseHeaders) {
+            alert("Please provide valid column headers.");
+            return;
+        }
+
+        let csvLines = [];
+        csvLines.push(baseHeaders); 
+
+        // Order history chronologically ascending for analytical pipeline timelines
+        const orderedTimeline = [...decryptedTimeline].sort((a, b) => a.id.localeCompare(b.id));
+
+        orderedTimeline.forEach(entry => {
+            const rawInsight = (entry.aiInsights && entry.aiInsights[activeAgentProfile.name]) ? entry.aiInsights[activeAgentProfile.name] : "";
+            
+            const dateCell = escapeCsvCell(entry.id);
+            const insightCell = escapeCsvCell(rawInsight);
+
+            csvLines.push(`${dateCell},${insightCell}`);
+        });
+
+        csvTextarea.value = csvLines.join('\n');
+        csvOutputZone.classList.remove('visual-hidden');
+        csvCopyStatus.textContent = "";
+        csvTextarea.select();
+    });
+
+    copyCsvBtn.addEventListener('click', () => {
+        if (!csvTextarea.value) return;
+        navigator.clipboard.writeText(csvTextarea.value).then(() => {
+            csvCopyStatus.textContent = "CSV matrix copied to clipboard!";
+            setTimeout(() => { csvCopyStatus.textContent = ""; }, 3000);
+        });
+    });
+
+    // --- VIEW 4 SETTINGS & CONTEXTUAL BACKUP INTERFACES ---
     saveSettingsBtn.addEventListener('click', () => {
         globalAiConfig.endpoint = aiEndpointInput.value.trim().replace(/\/$/, "");
         globalAiConfig.model = aiModelInput.value.trim();
         localStorage.setItem('dayMemoryGlobalAiConfig', JSON.stringify(globalAiConfig));
-        alert("Global core settings mapped.");
+        alert("Global core engine settings mapped.");
     });
 
     exportBtn.addEventListener('click', () => {
+        backupMode = "export";
         backupIoZone.classList.remove('visual-hidden');
         backupTextarea.value = localStorage.getItem('dayMemoryVault') || "";
+        backupTextarea.readOnly = true;
+        backupActionSubmitBtn.textContent = "📋 Copy to Clipboard";
+        backupActionSubmitBtn.className = ""; 
+        backupStatusMsg.textContent = "";
         backupTextarea.select();
     });
 
     importBtn.addEventListener('click', () => {
+        backupMode = "import";
         backupIoZone.classList.remove('visual-hidden');
         backupTextarea.value = "";
-        backupTextarea.placeholder = "Paste raw encrypted string structure blocks here...";
+        backupTextarea.readOnly = false;
+        backupTextarea.placeholder = "Paste raw encrypted string structure blocks here for timeline state restoration...";
+        backupActionSubmitBtn.textContent = "🔥 Restore Backup (Overwrite)";
+        backupActionSubmitBtn.className = "danger-btn"; 
+        backupStatusMsg.textContent = "";
     });
 
     backupActionSubmitBtn.addEventListener('click', () => {
-        const str = backupTextarea.value.trim();
-        if (!str) return;
-        localStorage.setItem('dayMemoryVault', str);
-        alert("Cipher text structural adjustments written. App environment will refresh now.");
-        window.location.reload();
+        if (backupMode === "export") {
+            if (!backupTextarea.value) return;
+            navigator.clipboard.writeText(backupTextarea.value).then(() => {
+                backupStatusMsg.textContent = "Encrypted vault string copied to clipboard!";
+            });
+        } else {
+            const str = backupTextarea.value.trim();
+            if (!str) return;
+            if (confirm("This will overwrite all current system entries with your backup text. Proceed?")) {
+                localStorage.setItem('dayMemoryVault', str);
+                alert("Vault string imported successfully! App environment will now refresh.");
+                window.location.reload();
+            }
+        }
     });
 
     lockBtn.addEventListener('click', () => window.location.reload());

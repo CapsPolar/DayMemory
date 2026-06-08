@@ -59,7 +59,6 @@
                     <button id="agent-configure-toggle-btn" class="text-link-btn">Configure Agent ⚙️</button>
                 </div>
 
-                <!-- Live Configuration Dropdown Grid -->
                 <div id="agent-config-panel" class="panel-box visual-hidden">
                     <div class="input-group">
                         <label>Agent Name</label>
@@ -84,6 +83,22 @@
                     <div id="batch-progress-msg" class="status-msg"></div>
                 </div>
 
+                <div class="section-title">Export Data Matrix</div>
+                <div class="panel-box">
+                    <p class="section-desc">Compile this agent's generated insights history into a structured CSV format table.</p>
+                    <div class="input-group" style="margin-top: 0.5rem;">
+                        <label for="csv-headers-input">CSV Column Header Names (comma separated):</label>
+                        <input type="text" id="csv-headers-input" value="Date,Insight Text">
+                    </div>
+                    <button id="generate-csv-btn" class="secondary-btn" style="margin-bottom: 0.5rem;">📊 Generate Agent CSV</button>
+                    
+                    <div id="csv-output-zone" class="visual-hidden">
+                        <textarea id="csv-textarea" readonly style="min-height: 100px; font-family: monospace; font-size: 0.85rem;"></textarea>
+                        <button id="copy-csv-btn">📋 Copy CSV to Clipboard</button>
+                        <span id="csv-copy-status" class="status-msg"></span>
+                    </div>
+                </div>
+
                 <div class="section-title">Insight Records</div>
                 <div id="agent-insights-timeline"></div>
             </section>
@@ -94,7 +109,7 @@
                 <div class="panel-box">
                     <div class="input-group">
                         <label for="ai-endpoint">Ollama Endpoint URL</label>
-                        <input type="url" id="ai-endpoint" placeholder="http://10.0.2.2:11434 or http://127.0.0.1:11434">
+                        <input type="url" id="ai-endpoint" placeholder="http://127.0.0.1:11434">
                     </div>
                     <div class="input-group">
                         <label for="ai-model">Target Model Name</label>
@@ -113,6 +128,7 @@
                     <div id="backup-io-zone" class="visual-hidden">
                         <textarea id="backup-textarea" placeholder="Paste data array string here for restoration..."></textarea>
                         <button id="backup-action-submit-btn">Execute Backup Change</button>
+                        <span id="backup-status-msg" class="status-msg"></span>
                     </div>
                 </div>
             </section>
