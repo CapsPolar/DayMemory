@@ -17,6 +17,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const formLabel = document.getElementById('form-label');
     const saveBtn = document.getElementById('save-btn');
     const memoriesContainer = document.getElementById('memories-container');
+    const calendarPicker = document.getElementById('calendar-picker');
+    const quickAddEmptyBtn = document.getElementById('quick-add-empty-btn');
 
     // 4. View 2 (Agents Hub) Elements
     const agentsListContainer = document.getElementById('agents-list-container');
@@ -131,6 +133,9 @@ document.addEventListener('DOMContentLoaded', () => {
         authModal.classList.add('visual-hidden');
         mainApp.classList.remove('visual-hidden');
         
+        // Populate standard system input baseline properties
+        calendarPicker.value = getTodayKey();
+
         displayMemories(success);
         if (success) updateFormContext(getTodayKey());
     });
@@ -158,9 +163,45 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('dayMemoryVault', ciphertext);
     }
 
-    // --- HOME VIEW LOGIC (Timeline Updates) ---
+    // --- HOME VIEW LOGIC (Timeline Updates with Calendar Extensions) ---
+    calendarPicker.addEventListener('change', (e) => {
+        if (e.target.value) {
+            updateFormContext(e.target.value);
+        }
+    });
+
+    // FEATURE: Instantiates an empty memory slot immediately for any chosen date
+    quickAddEmptyBtn.addEventListener('click', () => {
+        const selectedDate = calendarPicker.value;
+        if (!selectedDate) {
+            alert("Please pick a valid date on the calendar input before adding.");
+            return;
+        }
+
+        const existingEntry = decryptedTimeline.find(item => item.id === selectedDate);
+        if (existingEntry) {
+            alert(`A log matrix slot already exists for ${formatReadableDate(selectedDate)}. Loading it directly instead.`);
+            updateFormContext(selectedDate);
+            return;
+        }
+
+        // Push empty frame architecture
+        decryptedTimeline.push({
+            id: selectedDate,
+            text: "",
+            readableDate: formatReadableDate(selectedDate),
+            aiInsights: {}
+        });
+        decryptedTimeline.sort((a, b) => b.id.localeCompare(a.id));
+
+        encryptAndSaveVault();
+        displayMemories(true);
+        updateFormContext(selectedDate);
+    });
+
     function updateFormContext(dateKey) {
         currentTargetDateKey = dateKey;
+        calendarPicker.value = dateKey; // Force alignment
         const existingEntry = decryptedTimeline.find(item => item.id === dateKey);
         const isToday = (dateKey === getTodayKey());
 
@@ -178,7 +219,11 @@ document.addEventListener('DOMContentLoaded', () => {
     memoryForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const text = memoryInput.value.trim();
-        if (!text) return;
+        
+        // FEATURE: Confirmation protection gateway before description changes save
+        if (!confirm(`Are you sure you want to save modifications to the description text for ${formatReadableDate(currentTargetDateKey)}?`)) {
+            return;
+        }
 
         const existingIndex = decryptedTimeline.findIndex(item => item.id === currentTargetDateKey);
         if (existingIndex !== -1) {
@@ -195,7 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         encryptAndSaveVault();
         displayMemories(true);
-        updateFormContext(getTodayKey());
+        updateFormContext(currentTargetDateKey);
     });
 
     function displayMemories(isSuccess) {
@@ -215,14 +260,32 @@ document.addEventListener('DOMContentLoaded', () => {
             card.innerHTML = `
                 <div class="memory-card-header">
                     <div>${memory.readableDate}</div>
-                    <button class="text-link-btn edit-entry-trigger">Edit</button>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="text-link-btn edit-entry-trigger">Edit</button>
+                        <button class="text-link-btn delete-entry-trigger" style="color: var(--danger);">Delete</button>
+                    </div>
                 </div>
-                <div class="memory-text">${memory.text}</div>
+                <div class="memory-text">${memory.text || '<span style="color:var(--text-muted); font-style:italic;">[Empty entry block - click edit to write]</span>'}</div>
             `;
+            
+            // Edit trigger click listener
             card.querySelector('.edit-entry-trigger').addEventListener('click', () => {
                 updateFormContext(memory.id);
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             });
+
+            // FEATURE: Deletion pipeline framework attached with warning verification logic
+            card.querySelector('.delete-entry-trigger').addEventListener('click', () => {
+                if (confirm(`⚠️ DANGER: Are you sure you want to permanently delete the memory from ${memory.readableDate}? This action cannot be reversed.`)) {
+                    decryptedTimeline = decryptedTimeline.filter(item => item.id !== memory.id);
+                    encryptAndSaveVault();
+                    displayMemories(true);
+                    
+                    // Reset input view fields safely back to matching current settings context
+                    updateFormContext(getTodayKey());
+                }
+            });
+
             memoriesContainer.appendChild(card);
         });
     }
@@ -354,7 +417,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div>${entry.readableDate}</div>
                     <button class="text-link-btn single-day-run-trigger">${insightText ? '🔄 Re-Analyze' : '✨ Analyze Day'}</button>
                 </div>
-                <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:0.5rem; background:rgba(0,0,0,0.02); padding:0.4rem; border-radius:4px;">Log: "${entry.text}"</div>
+                <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:0.5rem; background:rgba(0,0,0,0.02); padding:0.4rem; border-radius:4px;">Log: "${entry.text || '(No entry text added)'}"</div>
                 <textarea class="agent-insight-edit-box" placeholder="No insight output logged. Click 'Analyze' to query model...">${insightText}</textarea>
             `;
 
@@ -367,7 +430,7 @@ document.addEventListener('DOMContentLoaded', () => {
             row.querySelector('.single-day-run-trigger').addEventListener('click', async (e) => {
                 e.target.disabled = true;
                 e.target.textContent = "Querying Local LLM...";
-                const res = await callOllamaPipeline(activeAgentProfile.prompt, entry.text);
+                const res = await callOllamaPipeline(activeAgentProfile.prompt, entry.text || "");
                 if (res) {
                     entry.aiInsights[activeAgentProfile.name] = res;
                     encryptAndSaveVault();
@@ -415,7 +478,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (!entry.aiInsights) entry.aiInsights = {};
 
-            const out = await callOllamaPipeline(activeAgentProfile.prompt, entry.text);
+            const out = await callOllamaPipeline(activeAgentProfile.prompt, entry.text || "");
             if (out) {
                 entry.aiInsights[activeAgentProfile.name] = out;
                 encryptAndSaveVault();

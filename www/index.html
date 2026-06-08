@@ -37,6 +37,13 @@
             <section id="view-home" class="nav-view-panel active">
                 <form id="memory-form" class="editor-card">
                     <label id="form-label" for="memory-input">Today's Reflection:</label>
+                    
+                    <!-- Integrated Date Picker & Empty Entry Instantiation Control Matrix Row -->
+                    <div class="calendar-action-row" style="display: flex; gap: 0.5rem; margin-bottom: 0.8rem; width: 100%;">
+                        <input type="date" id="calendar-picker" style="flex: 1; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px; font-family: inherit;">
+                        <button type="button" id="quick-add-empty-btn" class="secondary-btn" style="margin: 0; width: auto; font-size: 0.85rem; padding: 0.5rem 0.8rem;">➕ Quick Add Empty Day</button>
+                    </div>
+
                     <textarea id="memory-input" placeholder="How was your day? Write your thoughts..." required></textarea>
                     <button type="submit" id="save-btn">Save Reflection</button>
                 </form>
