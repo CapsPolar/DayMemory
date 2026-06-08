@@ -39,6 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const activeAgentHeading = document.getElementById('active-agent-heading');
     const activeAgentPromptPreview = document.getElementById('active-agent-prompt-preview');
     const batchRunBtn = document.getElementById('batch-run-btn');
+    const clearInsightsBtn = document.getElementById('clear-insights-btn');
     const batchProgressMsg = document.getElementById('batch-progress-msg');
     const agentInsightsTimeline = document.getElementById('agent-insights-timeline');
 
@@ -427,6 +428,27 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => { batchProgressMsg.textContent = ""; }, 5000);
     });
 
+    // --- FEATURE: CLEAR AGENT INSIGHT HISTORY SYSTEM ---
+    clearInsightsBtn.addEventListener('click', () => {
+        if (!activeAgentProfile || decryptedTimeline.length === 0) return;
+        if (!confirm(`Are you sure you want to permanently clear all generated insight metrics for the agent: "${activeAgentProfile.name}" across all historical days?`)) return;
+
+        decryptedTimeline.forEach(entry => {
+            if (entry.aiInsights && entry.aiInsights[activeAgentProfile.name] !== undefined) {
+                delete entry.aiInsights[activeAgentProfile.name];
+            }
+        });
+
+        encryptAndSaveVault();
+        renderAgentInsightsTimelineList();
+        
+        // Hide CSV workspace if open since data no longer matches
+        csvOutputZone.classList.add('visual-hidden');
+        
+        batchProgressMsg.textContent = "🗑️ All insights for this agent cleared.";
+        setTimeout(() => { batchProgressMsg.textContent = ""; }, 4000);
+    });
+
     // --- CSV MULTI-ROW ESCAPED DATA GENERATOR ENGINE ---
     function escapeCsvCell(text) {
         if (text === null || text === undefined) return '""';
@@ -464,7 +486,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const cleanedLine = line.trim();
                 if (!cleanedLine) return; // Skip empty trailing lines inside an entry
 
-                // FIX START HERE: Split strictly by comma, preserving spaces within words
+                // FIX: Split strictly by structural commas, safeguarding space structures in phrases
                 const rawCells = cleanedLine.split(',');
 
                 // Step 3: Prepare the row array, anchoring the first column with the entry date
@@ -474,16 +496,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 rawCells.forEach(cell => {
                     let standardCell = cell.trim();
                     
-                    // Strip outermost quotes if the text chunk already has them
+                    // Strip outermost quotes if the text chunk already has them so we can clean it
                     if (standardCell.startsWith('"') && standardCell.endsWith('"')) {
                         standardCell = standardCell.slice(1, -1).trim();
                     }
 
                     // Attempt numerical conversion (integerize or floatize)
                     if (standardCell !== "" && !isNaN(standardCell)) {
+                        // If parsing the number results in the exact same value, output it nakedly
                         rowCells.push(Number(standardCell));
                     } else {
-                        // This securely handles internal spaces and special characters
+                        // Otherwise, re-package it through our secure CSV escape text formatter
                         rowCells.push(escapeCsvCell(standardCell));
                     }
                 });
