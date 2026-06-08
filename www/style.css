@@ -479,3 +479,144 @@ button:hover {
         background-color: rgba(99, 102, 241, 0.02);
     }
 }
+
+
+
+/* --- Multi-AI Grid Infrastructure layout --- */
+.config-row {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-end;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.input-group-inline {
+    flex: 1;
+    min-width: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.input-group-inline label {
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+.input-group-inline input {
+    padding: 0.5rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background-color: var(--card-bg);
+    color: var(--text-main);
+}
+
+#save-global-ai-btn {
+    padding: 0.55rem 1rem;
+}
+
+.profile-input-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.profile-input-grid input {
+    padding: 0.6rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    font-size: 0.95rem;
+}
+
+/* --- Profile Action Board Cards --- */
+.profile-agent-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 1.25rem;
+    margin-top: 1rem;
+    box-shadow: var(--shadow);
+}
+
+.profile-header-wrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.5rem;
+}
+
+.profile-title-tag {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--accent);
+}
+
+.delete-profile-btn {
+    background: none;
+    border: none;
+    color: #ef4444;
+    font-size: 0.8rem;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.profile-prompt-preview {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    background-color: var(--bg-color);
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    margin-bottom: 0.75rem;
+    white-space: pre-wrap;
+}
+
+.agent-control-tray {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.agent-control-tray button {
+    width: auto;
+    font-size: 0.85rem;
+    padding: 0.4rem 0.75rem;
+}
+
+/* --- Inline Day-wise Workspace Styles --- */
+#day-insights-workspace {
+    margin-bottom: 1rem;
+    background-color: var(--bg-color);
+}
+
+.day-insight-row-item {
+    border-bottom: 1px dashed var(--border-color);
+    padding: 0.75rem 0;
+}
+
+.day-insight-row-item:last-child {
+    border-bottom: none;
+}
+
+.day-insight-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.25rem;
+}
+
+.day-insight-label {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.day-insight-body-text {
+    font-size: 0.9rem;
+    font-style: italic;
+    color: var(--text-muted);
+    white-space: pre-wrap;
+    padding-left: 0.5rem;
+}

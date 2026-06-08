@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DayMemory (AI-Augmented Vault)</title>
+    <title>DayMemory (Multi-AI Vault)</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 </head>
@@ -19,37 +19,11 @@
         </div>
     </div>
 
-    <div id="settings-modal" class="modal-overlay visual-hidden">
-        <div class="modal-content settings-content">
-            <h2>Ollama AI Settings</h2>
-            <p>Configure connection coordinates for your local machine LLM environment.</p>
-            <form id="settings-form">
-                <div class="input-group">
-                    <label for="ai-endpoint">Ollama Endpoint URL:</label>
-                    <input type="url" id="ai-endpoint" placeholder="http://127.0.0.1:11434" required>
-                </div>
-                <div class="input-group">
-                    <label for="ai-model">Model Name:</label>
-                    <input type="text" id="ai-model" placeholder="llama3" required>
-                </div>
-                <div class="input-group">
-                    <label for="ai-prompt">System/Analysis Prompt:</label>
-                    <textarea id="ai-prompt" placeholder="Extract key insights, mood, metrics..." required></textarea>
-                </div>
-                <div class="settings-actions">
-                    <button type="submit">Save Configurations</button>
-                    <button type="button" id="close-settings-btn" class="secondary-btn">Cancel</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
     <div class="app-container visual-hidden" id="main-app">
         <header>
             <h1>DayMemory</h1>
-            <p>Your zero-knowledge, AI-integrated local vault.</p>
+            <p>Your zero-knowledge, multi-agent AI journal.</p>
             <div class="header-controls">
-                <button id="settings-open-btn" class="secondary-btn">⚙️ AI Settings</button>
                 <button id="lock-btn" class="secondary-btn">🔒 Lock App</button>
             </div>
         </header>
@@ -61,9 +35,9 @@
                     <textarea id="memory-input" placeholder="Write your description here..." required></textarea>
                 </div>
                 
-                <div id="ai-edit-group" class="input-group visual-hidden">
-                    <label for="ai-memory-input">Edit AI Summary:</label>
-                    <textarea id="ai-memory-input" placeholder="AI analysis text..."></textarea>
+                <div id="day-insights-workspace" class="panel-box visual-hidden">
+                    <label>Day-Wise AI Analyses Tracker:</label>
+                    <div id="day-insights-list"></div>
                 </div>
 
                 <button type="submit" id="save-btn">Save Memory</button> 
@@ -72,6 +46,35 @@
             <section class="memories-section">
                 <h2>Your Secure Timeline</h2>
                 <div id="memories-container"></div>
+            </section>
+
+            <hr class="section-divider">
+            <section class="ai-dashboard-section">
+                <h2>🤖 Multi-AI Analytics Profiles</h2>
+                <p class="section-desc">Create distinct analysis agents. Each profile can scan your entire journal timeline using its own specialized system prompt.</p>
+
+                <div class="config-row">
+                    <div class="input-group-inline">
+                        <label for="ai-endpoint">Ollama Endpoint:</label>
+                        <input type="url" id="ai-endpoint" placeholder="http://127.0.0.1:11434" required>
+                    </div>
+                    <div class="input-group-inline">
+                        <label for="ai-model">Model Name:</label>
+                        <input type="text" id="ai-model" placeholder="llama3" required>
+                    </div>
+                    <button id="save-global-ai-btn" class="secondary-btn">Save Server Credentials</button>
+                </div>
+
+                <form id="profile-creation-form" class="panel-box">
+                    <label>Create New Analytics Profile Agent</label>
+                    <div class="profile-input-grid">
+                        <input type="text" id="new-profile-name" placeholder="Profile Name (e.g., MoodTracker, Summary, Habits)" required>
+                        <textarea id="new-profile-prompt" placeholder="Provide distinct analytical processing instructions for the AI agent..." required></textarea>
+                    </div>
+                    <button type="submit" style="margin-top: 0.5rem;">Add Profile Agent</button>
+                </form>
+
+                <div id="active-profiles-container"></div>
             </section>
 
             <hr class="section-divider">
