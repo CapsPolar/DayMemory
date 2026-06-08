@@ -59,10 +59,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveSettingsBtn = document.getElementById('save-settings-btn');
     const exportBtn = document.getElementById('export-btn');
     const importBtn = document.getElementById('import-btn');
+    const changePwdBtn = document.getElementById('change-pwd-btn');
     const backupIoZone = document.getElementById('backup-io-zone');
     const backupTextarea = document.getElementById('backup-textarea');
     const backupActionSubmitBtn = document.getElementById('backup-action-submit-btn');
     const backupStatusMsg = document.getElementById('backup-status-msg');
+
+    // Password Management UI Elements
+    const changePwdZone = document.getElementById('change-pwd-zone');
+    const oldPasswordInput = document.getElementById('old-password-input');
+    const newPasswordInput = document.getElementById('new-password-input');
+    const newPasswordConfirm = document.getElementById('new-password-confirm');
+    const submitChangePwdBtn = document.getElementById('submit-change-pwd-btn');
+    const pwdStatusMsg = document.getElementById('pwd-status-msg');
 
     // Volatile State Enclosures
     let sessionKey = "";
@@ -118,6 +127,9 @@ document.addEventListener('DOMContentLoaded', () => {
             viewTitle.textContent = "Settings";
             aiEndpointInput.value = globalAiConfig.endpoint;
             aiModelInput.value = globalAiConfig.model;
+            // Collapse administrative expansion frames safely on tab focus
+            backupIoZone.classList.add('visual-hidden');
+            changePwdZone.classList.add('visual-hidden');
         }
     }
 
@@ -603,6 +615,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     exportBtn.addEventListener('click', () => {
         backupMode = "export";
+        changePwdZone.classList.add('visual-hidden');
         backupIoZone.classList.remove('visual-hidden');
         backupTextarea.value = localStorage.getItem('dayMemoryVault') || "";
         backupTextarea.readOnly = true;
@@ -614,6 +627,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     importBtn.addEventListener('click', () => {
         backupMode = "import";
+        changePwdZone.classList.add('visual-hidden');
         backupIoZone.classList.remove('visual-hidden');
         backupTextarea.value = "";
         backupTextarea.readOnly = false;
@@ -637,6 +651,65 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert("Vault string imported successfully! App environment will now refresh.");
                 window.location.reload();
             }
+        }
+    });
+
+    // --- FEATURE: CHANGE MASTER PASSWORD CRYPTO PIPELINE ---
+    changePwdBtn.addEventListener('click', () => {
+        backupIoZone.classList.add('visual-hidden');
+        changePwdZone.classList.toggle('visual-hidden');
+        oldPasswordInput.value = "";
+        newPasswordInput.value = "";
+        newPasswordConfirm.value = "";
+        pwdStatusMsg.textContent = "";
+        pwdStatusMsg.style.color = "inherit";
+    });
+
+    submitChangePwdBtn.addEventListener('click', () => {
+        const oldPwd = oldPasswordInput.value.trim();
+        const newPwd = newPasswordInput.value.trim();
+        const confirmNewPwd = newPasswordConfirm.value.trim();
+
+        if (!oldPwd || !newPwd || !confirmNewPwd) {
+            pwdStatusMsg.textContent = "❌ Please fulfill all verification parameters.";
+            pwdStatusMsg.style.color = "var(--danger)";
+            return;
+        }
+
+        if (oldPwd !== sessionKey) {
+            pwdStatusMsg.textContent = "❌ Confirmed old master password validation fails.";
+            pwdStatusMsg.style.color = "var(--danger)";
+            return;
+        }
+
+        if (newPwd !== confirmNewPwd) {
+            pwdStatusMsg.textContent = "❌ Mismatch across new target password entries.";
+            pwdStatusMsg.style.color = "var(--danger)";
+            return;
+        }
+
+        if (oldPwd === newPwd) {
+            pwdStatusMsg.textContent = "❌ New password must be distinct from old baseline configuration.";
+            pwdStatusMsg.style.color = "var(--danger)";
+            return;
+        }
+
+        try {
+            // Re-keying action: Update state token, overwrite local encryption record structure
+            sessionKey = newPwd;
+            encryptAndSaveVault();
+
+            pwdStatusMsg.textContent = "🎉 Encryption key swapped! Reloading engine state...";
+            pwdStatusMsg.style.color = "green";
+            
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+
+        } catch (e) {
+            pwdStatusMsg.textContent = "❌ Re-keying operation aborted due to local state error.";
+            pwdStatusMsg.style.color = "var(--danger)";
+            sessionKey = oldPwd; // Rollback
         }
     });
 

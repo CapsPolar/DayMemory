@@ -9,7 +9,6 @@
 </head>
 <body>
 
-    <!-- 0. Auth Guard Modal -->
     <div id="auth-modal" class="modal-overlay">
         <div class="modal-content">
             <h2>Unlock Vault</h2>
@@ -21,24 +20,19 @@
         </div>
     </div>
 
-    <!-- Main View Frame -->
     <div id="main-app" class="app-container visual-hidden">
         
-        <!-- App Header Bar -->
         <header class="app-header">
             <h1 id="view-title">Home</h1>
             <button id="lock-btn" class="icon-btn" title="Lock Vault">🔒</button>
         </header>
 
-        <!-- View Panels Wrapper -->
         <div class="view-content-wrapper">
             
-            <!-- VIEW 1: HOME VIEW -->
             <section id="view-home" class="nav-view-panel active">
                 <form id="memory-form" class="editor-card">
                     <label id="form-label" for="memory-input">Today's Reflection:</label>
                     
-                    <!-- Integrated Date Picker & Empty Entry Instantiation Control Matrix Row -->
                     <div class="calendar-action-row" style="display: flex; gap: 0.5rem; margin-bottom: 0.8rem; width: 100%;">
                         <input type="date" id="calendar-picker" style="flex: 1; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px; font-family: inherit;">
                         <button type="button" id="quick-add-empty-btn" class="secondary-btn" style="margin: 0; width: auto; font-size: 0.85rem; padding: 0.5rem 0.8rem;">➕ Quick Add Empty Day</button>
@@ -52,14 +46,12 @@
                 <div id="memories-container"></div>
             </section>
 
-            <!-- VIEW 2: AGENTS MASTER VIEW -->
             <section id="view-agents" class="nav-view-panel">
                 <div class="section-title">Your AI Insights Agents</div>
                 <div id="agents-list-container"></div>
                 <button id="add-agent-fab" class="fab-btn" title="Add New Agent">+</button>
             </section>
 
-            <!-- VIEW 3: AGENT DETAILS LAYER VIEW (Drill Down) -->
             <section id="view-agent-detail" class="nav-view-panel">
                 <div class="back-bar">
                     <button id="agent-detail-back-btn" class="text-link-btn">← Back to Agents</button>
@@ -113,7 +105,6 @@
                 <div id="agent-insights-timeline"></div>
             </section>
 
-            <!-- VIEW 4: SETTINGS VIEW -->
             <section id="view-settings" class="nav-view-panel">
                 <div class="section-title">Ollama Engine Parameters</div>
                 <div class="panel-box">
@@ -130,22 +121,40 @@
 
                 <div class="section-title">Data Administration</div>
                 <div class="panel-box">
-                    <p class="section-desc">Manage encrypted vault string backups directly.</p>
-                    <div class="backup-actions">
-                        <button id="export-btn" class="secondary-btn">Export Vault String</button>
-                        <button id="import-btn" class="secondary-btn">Import Vault String</button>
+                    <p class="section-desc">Manage encrypted vault string backups and security settings directly.</p>
+                    <div class="backup-actions" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <button id="export-btn" class="secondary-btn" style="flex: 1;">Export Vault String</button>
+                        <button id="import-btn" class="secondary-btn" style="flex: 1;">Import Vault String</button>
+                        <button id="change-pwd-btn" class="secondary-btn" style="flex: 1; min-width: 150px;">🔑 Change Password</button>
                     </div>
-                    <div id="backup-io-zone" class="visual-hidden">
+                    
+                    <div id="backup-io-zone" class="visual-hidden" style="margin-top: 1rem;">
                         <textarea id="backup-textarea" placeholder="Paste data array string here for restoration..."></textarea>
                         <button id="backup-action-submit-btn">Execute Backup Change</button>
                         <span id="backup-status-msg" class="status-msg"></span>
+                    </div>
+
+                    <div id="change-pwd-zone" class="visual-hidden" style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 1rem;">
+                        <div class="input-group">
+                            <label for="old-password-input">Confirm Current Master Password</label>
+                            <input type="password" id="old-password-input" autocomplete="off">
+                        </div>
+                        <div class="input-group">
+                            <label for="new-password-input">New Master Password</label>
+                            <input type="password" id="new-password-input" autocomplete="off">
+                        </div>
+                        <div class="input-group">
+                            <label for="new-password-confirm">Confirm New Master Password</label>
+                            <input type="password" id="new-password-confirm" autocomplete="off">
+                        </div>
+                        <button id="submit-change-pwd-btn" class="danger-btn">Update Vault Security Key</button>
+                        <span id="pwd-status-msg" class="status-msg"></span>
                     </div>
                 </div>
             </section>
 
         </div>
 
-        <!-- Sticky Mobile Bottom Navigation Bar Menu -->
         <nav class="bottom-nav">
             <button class="nav-item active" data-target="view-home">
                 <span class="nav-icon">🏠</span>
@@ -162,7 +171,6 @@
         </nav>
     </div>
 
-    <!-- Create Agent Popup Sheet Overlay Layer -->
     <div id="create-agent-modal" class="modal-overlay visual-hidden">
         <div class="modal-content">
             <h2>New Agent Profile</h2>
