@@ -11,6 +11,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const mainApp = document.getElementById('main-app');
     const lockBtn = document.getElementById('lock-btn');
 
+    // 2b. Lock-Screen Buffer UI Elements
+    const lockViewToggleBtn = document.getElementById('lock-view-toggle-btn');
+    const authFormPanel = document.getElementById('auth-form-panel');
+    const bufferPanel = document.getElementById('buffer-panel');
+    const bufferForm = document.getElementById('buffer-form');
+    const bufferInput = document.getElementById('buffer-input');
+    const bufferFormLabel = document.getElementById('buffer-form-label');
+    const bufferSaveBtn = document.getElementById('buffer-save-btn');
+    const bufferCalendarPicker = document.getElementById('buffer-calendar-picker');
+    const bufferQuickAddEmptyBtn = document.getElementById('buffer-quick-add-empty-btn');
+    const bufferTimelineContainer = document.getElementById('buffer-timeline-container');
+
     // 3. View 1 (Home) Elements
     const memoryForm = document.getElementById('memory-form');
     const memoryInput = document.getElementById('memory-input');
@@ -78,6 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let decryptedTimeline = [];
     let activeAgentProfile = null; 
     let currentTargetDateKey = getTodayKey();
+    let bufferTargetDateKey = getTodayKey();
     let backupMode = "export"; // Tracking interface state: 'export' | 'import'
 
     // Configuration Core Sets
@@ -99,6 +112,70 @@ document.addEventListener('DOMContentLoaded', () => {
         return dateObj.toLocaleDateString('en-US', {
             weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
         });
+    }
+
+    // --- SHARED AUTO-TIMESTAMP FEATURE (Vault writes + Buffer writes) ---
+    function getTimestampString() {
+        const now = new Date();
+        const formatted = now.toLocaleString('en-US', {
+            month: 'numeric', day: 'numeric', year: 'numeric',
+            hour: 'numeric', minute: '2-digit', hour12: true
+        });
+        return `[${formatted}]: `;
+    }
+
+    function insertAutoTimestamp(textareaEl) {
+        const stamp = getTimestampString();
+        const current = textareaEl.value;
+        if (!current.trim()) {
+            textareaEl.value = stamp;
+        } else {
+            textareaEl.value = current.replace(/\s+$/, '') + '\n\n' + stamp;
+        }
+        textareaEl.focus();
+        const endPos = textareaEl.value.length;
+        textareaEl.setSelectionRange(endPos, endPos);
+    }
+
+    // --- UNENCRYPTED LOCAL BUFFER (Append-without-password pipeline) ---
+    function getPendingBuffer() {
+        return JSON.parse(localStorage.getItem('dayMemoryPendingAppends')) || {};
+    }
+
+    function savePendingBuffer(bufferObj) {
+        localStorage.setItem('dayMemoryPendingAppends', JSON.stringify(bufferObj));
+    }
+
+    // Merges every pending buffer date into the decrypted vault as an <append> block,
+    // then clears the buffer. Returns how many dates were merged (0 = nothing to do).
+    function mergeBufferIntoVault() {
+        const buffer = getPendingBuffer();
+        const dateKeys = Object.keys(buffer).filter(k => buffer[k] && buffer[k].trim());
+        if (dateKeys.length === 0) return 0;
+
+        dateKeys.forEach(dateKey => {
+            const appendBlock = `<append>${buffer[dateKey].trim()}</append>`;
+            const existingIndex = decryptedTimeline.findIndex(item => item.id === dateKey);
+
+            if (existingIndex !== -1) {
+                const existingText = decryptedTimeline[existingIndex].text || "";
+                decryptedTimeline[existingIndex].text = existingText
+                    ? `${existingText}\n\n${appendBlock}`
+                    : appendBlock;
+            } else {
+                decryptedTimeline.push({
+                    id: dateKey,
+                    text: appendBlock,
+                    readableDate: formatReadableDate(dateKey),
+                    aiInsights: {}
+                });
+            }
+        });
+
+        decryptedTimeline.sort((a, b) => b.id.localeCompare(a.id));
+        encryptAndSaveVault();
+        localStorage.removeItem('dayMemoryPendingAppends');
+        return dateKeys.length;
     }
 
     // --- Tab-Switching & View Management System (Mobile Routing Engine) ---
@@ -142,6 +219,11 @@ document.addEventListener('DOMContentLoaded', () => {
         sessionKey = enteredPassword;
         const success = decryptAndLoadVault();
 
+        let mergedCount = 0;
+        if (success) {
+            mergedCount = mergeBufferIntoVault();
+        }
+
         authModal.classList.add('visual-hidden');
         mainApp.classList.remove('visual-hidden');
         
@@ -149,7 +231,13 @@ document.addEventListener('DOMContentLoaded', () => {
         calendarPicker.value = getTodayKey();
 
         displayMemories(success);
-        if (success) updateFormContext(getTodayKey());
+        if (success) updateFormContext(getTodayKey(), true);
+
+        if (mergedCount > 0) {
+            setTimeout(() => {
+                alert(`✅ ${mergedCount} pending buffer ${mergedCount === 1 ? 'entry has' : 'entries have'} been merged and securely encrypted into your vault. The local buffer is now cleared.`);
+            }, 150);
+        }
     });
 
     function decryptAndLoadVault() {
@@ -178,7 +266,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- HOME VIEW LOGIC (Timeline Updates with Calendar Extensions) ---
     calendarPicker.addEventListener('change', (e) => {
         if (e.target.value) {
-            updateFormContext(e.target.value);
+            updateFormContext(e.target.value, true);
         }
     });
 
@@ -208,10 +296,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         encryptAndSaveVault();
         displayMemories(true);
-        updateFormContext(selectedDate);
+        updateFormContext(selectedDate, true);
     });
 
-    function updateFormContext(dateKey) {
+    function updateFormContext(dateKey, withTimestamp = false) {
         currentTargetDateKey = dateKey;
         calendarPicker.value = dateKey; // Force alignment
         const existingEntry = decryptedTimeline.find(item => item.id === dateKey);
@@ -225,6 +313,10 @@ document.addEventListener('DOMContentLoaded', () => {
             memoryInput.value = "";
             formLabel.textContent = `Write about Today (${formatReadableDate(dateKey)}):`;
             saveBtn.textContent = "Save Reflection";
+        }
+
+        if (withTimestamp) {
+            insertAutoTimestamp(memoryInput);
         }
     }
 
@@ -282,7 +374,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Edit trigger click listener
             card.querySelector('.edit-entry-trigger').addEventListener('click', () => {
-                updateFormContext(memory.id);
+                updateFormContext(memory.id, true);
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             });
 
@@ -714,4 +806,124 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     lockBtn.addEventListener('click', () => window.location.reload());
+
+    // --- LOCK-SCREEN VIEW TOGGLE (Buffer UI <-> Unlock Form) ---
+    lockViewToggleBtn.addEventListener('click', () => {
+        const bufferCurrentlyShown = !bufferPanel.classList.contains('visual-hidden');
+        bufferPanel.classList.toggle('visual-hidden', bufferCurrentlyShown);
+        authFormPanel.classList.toggle('visual-hidden', !bufferCurrentlyShown);
+        lockViewToggleBtn.textContent = bufferCurrentlyShown ? "📝 Switch to Buffer" : "🔑 Switch to Unlock";
+    });
+
+    // --- BUFFER (APPEND-WITHOUT-PASSWORD) UI LOGIC ---
+    function updateBufferFormContext(dateKey, withTimestamp = false) {
+        bufferTargetDateKey = dateKey;
+        bufferCalendarPicker.value = dateKey;
+        const buffer = getPendingBuffer();
+        const existingText = buffer[dateKey] || "";
+        const isToday = (dateKey === getTodayKey());
+
+        bufferInput.value = existingText;
+        if (existingText) {
+            bufferFormLabel.textContent = `Editing Pending Buffer for ${formatReadableDate(dateKey)}:`;
+            bufferSaveBtn.textContent = "Update Buffer Entry";
+        } else {
+            bufferFormLabel.textContent = isToday
+                ? `Quick Add for Today (${formatReadableDate(dateKey)}):`
+                : `Quick Add for ${formatReadableDate(dateKey)}:`;
+            bufferSaveBtn.textContent = "Save to Buffer";
+        }
+
+        if (withTimestamp) {
+            insertAutoTimestamp(bufferInput);
+        }
+    }
+
+    bufferCalendarPicker.addEventListener('change', (e) => {
+        if (e.target.value) {
+            updateBufferFormContext(e.target.value, true);
+        }
+    });
+
+    bufferQuickAddEmptyBtn.addEventListener('click', () => {
+        const selectedDate = bufferCalendarPicker.value;
+        if (!selectedDate) {
+            alert("Please pick a valid date on the calendar input before adding.");
+            return;
+        }
+        const buffer = getPendingBuffer();
+        if (buffer[selectedDate] && buffer[selectedDate].trim()) {
+            alert(`A pending buffer entry already exists for ${formatReadableDate(selectedDate)}. Loading it directly instead.`);
+        }
+        updateBufferFormContext(selectedDate, true);
+    });
+
+    bufferForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const text = bufferInput.value.trim();
+
+        if (!confirm(`Save this pending buffer entry for ${formatReadableDate(bufferTargetDateKey)}? It stays unencrypted locally until you unlock the vault, then gets merged in and cleared from here.`)) {
+            return;
+        }
+
+        const buffer = getPendingBuffer();
+        buffer[bufferTargetDateKey] = text;
+        savePendingBuffer(buffer);
+
+        renderBufferTimeline();
+        updateBufferFormContext(bufferTargetDateKey);
+    });
+
+    function renderBufferTimeline() {
+        const buffer = getPendingBuffer();
+        const dateKeys = Object.keys(buffer)
+            .filter(k => buffer[k] && buffer[k].trim())
+            .sort((a, b) => b.localeCompare(a));
+
+        bufferTimelineContainer.innerHTML = '';
+
+        if (dateKeys.length === 0) {
+            bufferTimelineContainer.innerHTML = `<p class="status-msg">No pending buffer entries. Anything you write here stays local and unencrypted until you unlock the vault.</p>`;
+            return;
+        }
+
+        dateKeys.forEach(dateKey => {
+            const card = document.createElement('div');
+            card.className = 'memory-card';
+            card.innerHTML = `
+                <div class="memory-card-header">
+                    <div>${formatReadableDate(dateKey)} <span style="font-size:0.75rem; color: var(--text-muted);">(pending, unencrypted)</span></div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="text-link-btn buffer-edit-trigger">Edit</button>
+                        <button class="text-link-btn buffer-delete-trigger" style="color: var(--danger);">Delete</button>
+                    </div>
+                </div>
+                <div class="memory-text">${buffer[dateKey]}</div>
+            `;
+
+            card.querySelector('.buffer-edit-trigger').addEventListener('click', () => {
+                updateBufferFormContext(dateKey, true);
+                bufferPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+
+            card.querySelector('.buffer-delete-trigger').addEventListener('click', () => {
+                if (confirm(`⚠️ Discard the pending un-merged buffer entry for ${formatReadableDate(dateKey)}? This cannot be undone.`)) {
+                    const buf = getPendingBuffer();
+                    delete buf[dateKey];
+                    savePendingBuffer(buf);
+                    renderBufferTimeline();
+                    if (bufferTargetDateKey === dateKey) {
+                        updateBufferFormContext(getTodayKey());
+                    }
+                }
+            });
+
+            bufferTimelineContainer.appendChild(card);
+        });
+    }
+
+    // Initialize the lock-screen Buffer UI immediately on app open, with today's auto-timestamp
+    bufferCalendarPicker.value = getTodayKey();
+    updateBufferFormContext(getTodayKey(), true);
+    renderBufferTimeline();
 });
