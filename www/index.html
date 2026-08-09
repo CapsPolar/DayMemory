@@ -25,17 +25,16 @@
                 <h2>Quick Buffer</h2>
                 <p>Write freely without unlocking. Stored locally and unencrypted right here until you unlock the vault — then it's merged in and cleared from this buffer.</p>
 
-                <form id="buffer-form" class="editor-card">
+                <div id="buffer-form" class="editor-card">
                     <label id="buffer-form-label" for="buffer-input">Quick Add for Today (Buffer):</label>
 
                     <div class="calendar-action-row" style="display: flex; gap: 0.5rem; margin-bottom: 0.8rem; width: 100%;">
                         <input type="date" id="buffer-calendar-picker" style="flex: 1; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px; font-family: inherit;">
-                        <button type="button" id="buffer-quick-add-empty-btn" class="secondary-btn" style="margin: 0; width: auto; font-size: 0.85rem; padding: 0.5rem 0.8rem;">➕ New Day</button>
                     </div>
 
-                    <textarea id="buffer-input" placeholder="Jot something down..." required></textarea>
-                    <button type="submit" id="buffer-save-btn">Save to Buffer</button>
-                </form>
+                    <textarea id="buffer-input" placeholder="Jot something down..."></textarea>
+                    <span id="buffer-save-status" class="status-msg"></span>
+                </div>
 
                 <div class="section-title">Pending Buffer (Un-merged)</div>
                 <div id="buffer-timeline-container"></div>
@@ -55,17 +54,16 @@
         <div class="view-content-wrapper">
             
             <section id="view-home" class="nav-view-panel active">
-                <form id="memory-form" class="editor-card">
+                <div id="memory-form" class="editor-card">
                     <label id="form-label" for="memory-input">Today's Reflection:</label>
                     
                     <div class="calendar-action-row" style="display: flex; gap: 0.5rem; margin-bottom: 0.8rem; width: 100%;">
                         <input type="date" id="calendar-picker" style="flex: 1; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px; font-family: inherit;">
-                        <button type="button" id="quick-add-empty-btn" class="secondary-btn" style="margin: 0; width: auto; font-size: 0.85rem; padding: 0.5rem 0.8rem;">➕ Quick Add Empty Day</button>
                     </div>
 
-                    <textarea id="memory-input" placeholder="How was your day? Write your thoughts..." required></textarea>
-                    <button type="submit" id="save-btn">Save Reflection</button>
-                </form>
+                    <textarea id="memory-input" placeholder="How was your day? Write your thoughts..."></textarea>
+                    <span id="memory-save-status" class="status-msg"></span>
+                </div>
 
                 <div class="section-title">Timeline History</div>
                 <div id="memories-container"></div>

@@ -15,22 +15,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const lockViewToggleBtn = document.getElementById('lock-view-toggle-btn');
     const authFormPanel = document.getElementById('auth-form-panel');
     const bufferPanel = document.getElementById('buffer-panel');
-    const bufferForm = document.getElementById('buffer-form');
     const bufferInput = document.getElementById('buffer-input');
     const bufferFormLabel = document.getElementById('buffer-form-label');
-    const bufferSaveBtn = document.getElementById('buffer-save-btn');
+    const bufferSaveStatus = document.getElementById('buffer-save-status');
     const bufferCalendarPicker = document.getElementById('buffer-calendar-picker');
-    const bufferQuickAddEmptyBtn = document.getElementById('buffer-quick-add-empty-btn');
     const bufferTimelineContainer = document.getElementById('buffer-timeline-container');
 
     // 3. View 1 (Home) Elements
-    const memoryForm = document.getElementById('memory-form');
     const memoryInput = document.getElementById('memory-input');
     const formLabel = document.getElementById('form-label');
-    const saveBtn = document.getElementById('save-btn');
+    const memorySaveStatus = document.getElementById('memory-save-status');
     const memoriesContainer = document.getElementById('memories-container');
     const calendarPicker = document.getElementById('calendar-picker');
-    const quickAddEmptyBtn = document.getElementById('quick-add-empty-btn');
 
     // 4. View 2 (Agents Hub) Elements
     const agentsListContainer = document.getElementById('agents-list-container');
@@ -135,6 +131,16 @@ document.addEventListener('DOMContentLoaded', () => {
         textareaEl.focus();
         const endPos = textareaEl.value.length;
         textareaEl.setSelectionRange(endPos, endPos);
+    }
+
+    // --- AUTOSAVE STATUS INDICATOR HELPER ---
+    let savedIndicatorTimeouts = new WeakMap();
+    function flashSavedIndicator(el) {
+        if (!el) return;
+        el.textContent = "✓ Saved";
+        clearTimeout(savedIndicatorTimeouts.get(el));
+        const t = setTimeout(() => { el.textContent = ""; }, 1500);
+        savedIndicatorTimeouts.set(el, t);
     }
 
     // --- UNENCRYPTED LOCAL BUFFER (Append-without-password pipeline) ---
@@ -270,35 +276,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // FEATURE: Instantiates an empty memory slot immediately for any chosen date
-    quickAddEmptyBtn.addEventListener('click', () => {
-        const selectedDate = calendarPicker.value;
-        if (!selectedDate) {
-            alert("Please pick a valid date on the calendar input before adding.");
-            return;
-        }
-
-        const existingEntry = decryptedTimeline.find(item => item.id === selectedDate);
-        if (existingEntry) {
-            alert(`A log matrix slot already exists for ${formatReadableDate(selectedDate)}. Loading it directly instead.`);
-            updateFormContext(selectedDate);
-            return;
-        }
-
-        // Push empty frame architecture
-        decryptedTimeline.push({
-            id: selectedDate,
-            text: "",
-            readableDate: formatReadableDate(selectedDate),
-            aiInsights: {}
-        });
-        decryptedTimeline.sort((a, b) => b.id.localeCompare(a.id));
-
-        encryptAndSaveVault();
-        displayMemories(true);
-        updateFormContext(selectedDate, true);
-    });
-
     function updateFormContext(dateKey, withTimestamp = false) {
         currentTargetDateKey = dateKey;
         calendarPicker.value = dateKey; // Force alignment
@@ -308,26 +285,26 @@ document.addEventListener('DOMContentLoaded', () => {
         if (existingEntry) {
             memoryInput.value = existingEntry.text;
             formLabel.textContent = isToday ? `Editing Today (${formatReadableDate(dateKey)}):` : `Editing Entry for ${formatReadableDate(dateKey)}:`;
-            saveBtn.textContent = "Update Entry";
         } else {
             memoryInput.value = "";
             formLabel.textContent = `Write about Today (${formatReadableDate(dateKey)}):`;
-            saveBtn.textContent = "Save Reflection";
         }
 
         if (withTimestamp) {
             insertAutoTimestamp(memoryInput);
+            saveCurrentMemoryEntry();
         }
     }
 
-    memoryForm.addEventListener('submit', (e) => {
-        e.preventDefault();
+    // --- AUTOSAVE: writes to the vault shortly after the user stops typing ---
+    let memoryAutosaveTimeout = null;
+    memoryInput.addEventListener('input', () => {
+        clearTimeout(memoryAutosaveTimeout);
+        memoryAutosaveTimeout = setTimeout(saveCurrentMemoryEntry, 500);
+    });
+
+    function saveCurrentMemoryEntry() {
         const text = memoryInput.value.trim();
-        
-        // FEATURE: Confirmation protection gateway before description changes save
-        if (!confirm(`Are you sure you want to save modifications to the description text for ${formatReadableDate(currentTargetDateKey)}?`)) {
-            return;
-        }
 
         const existingIndex = decryptedTimeline.findIndex(item => item.id === currentTargetDateKey);
         if (existingIndex !== -1) {
@@ -344,8 +321,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         encryptAndSaveVault();
         displayMemories(true);
-        updateFormContext(currentTargetDateKey);
-    });
+        flashSavedIndicator(memorySaveStatus);
+    }
 
     function displayMemories(isSuccess) {
         memoriesContainer.innerHTML = '';
@@ -826,16 +803,15 @@ document.addEventListener('DOMContentLoaded', () => {
         bufferInput.value = existingText;
         if (existingText) {
             bufferFormLabel.textContent = `Editing Pending Buffer for ${formatReadableDate(dateKey)}:`;
-            bufferSaveBtn.textContent = "Update Buffer Entry";
         } else {
             bufferFormLabel.textContent = isToday
                 ? `Quick Add for Today (${formatReadableDate(dateKey)}):`
                 : `Quick Add for ${formatReadableDate(dateKey)}:`;
-            bufferSaveBtn.textContent = "Save to Buffer";
         }
 
         if (withTimestamp) {
             insertAutoTimestamp(bufferInput);
+            saveCurrentBufferEntry();
         }
     }
 
@@ -845,34 +821,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    bufferQuickAddEmptyBtn.addEventListener('click', () => {
-        const selectedDate = bufferCalendarPicker.value;
-        if (!selectedDate) {
-            alert("Please pick a valid date on the calendar input before adding.");
-            return;
-        }
-        const buffer = getPendingBuffer();
-        if (buffer[selectedDate] && buffer[selectedDate].trim()) {
-            alert(`A pending buffer entry already exists for ${formatReadableDate(selectedDate)}. Loading it directly instead.`);
-        }
-        updateBufferFormContext(selectedDate, true);
+    // --- AUTOSAVE: writes to the local buffer shortly after the user stops typing ---
+    let bufferAutosaveTimeout = null;
+    bufferInput.addEventListener('input', () => {
+        clearTimeout(bufferAutosaveTimeout);
+        bufferAutosaveTimeout = setTimeout(saveCurrentBufferEntry, 500);
     });
 
-    bufferForm.addEventListener('submit', (e) => {
-        e.preventDefault();
+    function saveCurrentBufferEntry() {
         const text = bufferInput.value.trim();
-
-        if (!confirm(`Save this pending buffer entry for ${formatReadableDate(bufferTargetDateKey)}? It stays unencrypted locally until you unlock the vault, then gets merged in and cleared from here.`)) {
-            return;
-        }
-
         const buffer = getPendingBuffer();
         buffer[bufferTargetDateKey] = text;
         savePendingBuffer(buffer);
 
         renderBufferTimeline();
-        updateBufferFormContext(bufferTargetDateKey);
-    });
+        flashSavedIndicator(bufferSaveStatus);
+    }
 
     function renderBufferTimeline() {
         const buffer = getPendingBuffer();
