@@ -6,6 +6,12 @@
     <title>DayMemory AI</title>
     <link rel="stylesheet" href="style.css">
     <script src="crypto-js.min.js"></script>
+
+    <!-- PWA: installable + offline support -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4f46e5">
+    <link rel="icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
 </head>
 <body>
 
@@ -215,5 +221,15 @@
     </div>
 
     <script src="script.js"></script>
+
+    <!-- PWA: register service worker for offline support -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .catch((err) => console.error('Service worker registration failed:', err));
+            });
+        }
+    </script>
 </body>
 </html>
