@@ -1,14 +1,15 @@
 // DayMemory AI - Service Worker
-// Caches the entire app shell so it works fully offline once installed.
+// Caches the app shell so it works fully offline once installed.
 
-const CACHE_NAME = 'daymemory-cache-v1';
+const CACHE_NAME = 'daymemory-cache-v2';
 
-// Everything the app needs to run with zero network access.
+// Files with stable names, known ahead of time. Vite's built JS/CSS bundle
+// has a hashed filename we can't list here, so it (and anything else)
+// gets cached on first fetch by the handler below instead.
 const APP_SHELL = [
   './',
   './index.html',
   './style.css',
-  './script.js',
   './crypto-js.min.js',
   './manifest.json',
   './icon-192.png',
@@ -38,10 +39,13 @@ self.addEventListener('activate', (event) => {
 });
 
 // Fetch: cache-first, falling back to network, then updating the cache.
-// NOTE: this intentionally only intercepts requests for the app's own
-// static files. Any request to a different origin (e.g. a local Ollama
-// endpoint you configure in Settings) is left alone and goes straight
-// to the network, since that's a runtime API call, not part of the app shell.
+// This also picks up Vite's hashed /assets/*.js and *.css bundle files
+// the first time they're requested, since we can't know their names in
+// advance. NOTE: this intentionally only intercepts requests for the
+// app's own static files. Any request to a different origin (e.g. a local
+// Ollama endpoint you configure in Settings) is left alone and goes
+// straight to the network, since that's a runtime API call, not part of
+// the app shell.
 self.addEventListener('fetch', (event) => {
   const requestUrl = new URL(event.request.url);
 
@@ -55,7 +59,6 @@ self.addEventListener('fetch', (event) => {
 
       return fetch(event.request)
         .then((networkResponse) => {
-          // Cache a copy of newly fetched app-shell files for next time offline.
           const responseClone = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, responseClone);
@@ -63,7 +66,6 @@ self.addEventListener('fetch', (event) => {
           return networkResponse;
         })
         .catch(() => {
-          // Offline and not cached: for navigations, fall back to index.html.
           if (event.request.mode === 'navigate') {
             return caches.match('./index.html');
           }

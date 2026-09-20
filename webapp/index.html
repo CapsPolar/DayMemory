@@ -4,14 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>DayMemory AI</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="crypto-js.min.js"></script>
+    <link rel="stylesheet" href="/style.css">
+    <script src="/crypto-js.min.js"></script>
 
     <!-- PWA: installable + offline support -->
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#4f46e5">
-    <link rel="icon" href="icon-192.png">
-    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="icon" href="/icon-192.png">
+    <link rel="apple-touch-icon" href="/icon-192.png">
 </head>
 <body>
 
@@ -51,18 +51,18 @@
     </div>
 
     <div id="main-app" class="app-container visual-hidden">
-        
+
         <header class="app-header">
             <h1 id="view-title">Home</h1>
             <button id="lock-btn" class="icon-btn" title="Lock Vault">🔒</button>
         </header>
 
         <div class="view-content-wrapper">
-            
+
             <section id="view-home" class="nav-view-panel active">
                 <div id="memory-form" class="editor-card">
                     <label id="form-label" for="memory-input">Today's Reflection:</label>
-                    
+
                     <div class="calendar-action-row" style="display: flex; gap: 0.5rem; margin-bottom: 0.8rem; width: 100%;">
                         <input type="date" id="calendar-picker" style="flex: 1; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px; font-family: inherit;">
                     </div>
@@ -122,7 +122,7 @@
                         <input type="text" id="csv-headers-input" value="Date,Insight Text">
                     </div>
                     <button id="generate-csv-btn" class="secondary-btn" style="margin-bottom: 0.5rem;">📊 Generate Agent CSV</button>
-                    
+
                     <div id="csv-output-zone" class="visual-hidden">
                         <textarea id="csv-textarea" readonly style="min-height: 100px; font-family: monospace; font-size: 0.85rem;"></textarea>
                         <button id="copy-csv-btn">📋 Copy CSV to Clipboard</button>
@@ -156,7 +156,7 @@
                         <button id="import-btn" class="secondary-btn" style="flex: 1;">Import Vault String</button>
                         <button id="change-pwd-btn" class="secondary-btn" style="flex: 1; min-width: 150px;">🔑 Change Password</button>
                     </div>
-                    
+
                     <div id="backup-io-zone" class="visual-hidden" style="margin-top: 1rem;">
                         <textarea id="backup-textarea" placeholder="Paste data array string here for restoration..."></textarea>
                         <button id="backup-action-submit-btn">Execute Backup Change</button>
@@ -220,13 +220,13 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script type="module" src="/src/main.ts"></script>
 
     <!-- PWA: register service worker for offline support -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('service-worker.js')
+                navigator.serviceWorker.register('/service-worker.js')
                     .catch((err) => console.error('Service worker registration failed:', err));
             });
         }
