@@ -299,27 +299,27 @@ button:active {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0.25rem;
+    padding: 0.25rem 0;
 }
 
 .modal-content {
     background-color: var(--card-bg);
-    border-radius: 14px;
-    padding: 1rem 0.6rem;
+    border-radius: 12px;
+    padding: 0.75rem 0.4rem;
     width: 100%;
-    max-width: 400px;
+    max-width: 600px;
     box-shadow: 0 10px 25px rgba(0,0,0,0.15);
 }
 
 .modal-content h2 {
-    margin-bottom: 0.5rem;
-    font-size: 1.3rem;
+    margin-bottom: 0.4rem;
+    font-size: 1.25rem;
 }
 
 .modal-content p {
     font-size: 0.85rem;
     color: var(--text-muted);
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
 }
 
 .memory-card-header {
