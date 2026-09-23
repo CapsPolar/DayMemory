@@ -35,6 +35,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const authModal = el<HTMLDivElement>("auth-modal");
   const authForm = el<HTMLFormElement>("auth-form");
   const passwordInput = el<HTMLInputElement>("password-input");
+  const authFirstTimeHint = el<HTMLParagraphElement>("auth-first-time-hint");
   const mainApp = el<HTMLDivElement>("main-app");
   const lockBtn = el<HTMLButtonElement>("lock-btn");
 
@@ -106,6 +107,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const newPasswordConfirm = el<HTMLInputElement>("new-password-confirm");
   const submitChangePwdBtn = el<HTMLButtonElement>("submit-change-pwd-btn");
   const pwdStatusMsg = el<HTMLSpanElement>("pwd-status-msg");
+
+  // A vault only exists once a password has been set on it, and exportRaw()
+  // returns falsy until that first unlock happens - reuse that same signal
+  // (rather than a separate flag) to greet brand-new users on the lock screen.
+  const isFirstTimeUser = !vaultService.exportRaw();
+  authFirstTimeHint.classList.toggle("visual-hidden", !isFirstTimeUser);
 
   // Volatile UI State
   let activeAgentProfile: AgentProfile | null = null;
