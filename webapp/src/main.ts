@@ -5,13 +5,41 @@ import type { AgentProfile } from "@core/models/Agent";
 import type { MemoryEntry } from "@core/models/Memory";
 import { getTodayKey, formatReadableDate, getTimestampString } from "@core/utils/date";
 
-import { LocalStorageAdapter } from "../adapters/LocalStorageAdapter";
+import { IndexedDBAdapter } from "../adapters/IndexedDBAdapter";
 import { CryptoJSAdapter } from "../adapters/CryptoJSAdapter";
 import { OllamaAdapter } from "../adapters/OllamaAdapter";
 
-document.addEventListener("DOMContentLoaded", () => {
+/** Replaces the lock screen with an explanation when IndexedDB can't be used. */
+function showFatalStorageError(err: unknown): void {
+  console.error(err);
+  const modal = document.getElementById("auth-modal");
+  if (!modal) return;
+  const message = err instanceof Error ? err.message : String(err);
+  modal.textContent = "";
+  const box = document.createElement("div");
+  box.className = "modal-content";
+  box.style.padding = "1.5rem";
+  const heading = document.createElement("h2");
+  heading.textContent = "Storage unavailable";
+  const body = document.createElement("p");
+  body.className = "status-msg";
+  body.style.display = "block";
+  body.textContent = `DayMemory keeps your vault in IndexedDB, which couldn't be opened (${message}). Your data has not been touched. Private/incognito mode or blocked site data can cause this.`;
+  box.append(heading, body);
+  modal.appendChild(box);
+}
+
+async function bootstrap(): Promise<void> {
+  // ---- Open IndexedDB before anything can read or write the vault ----
+  const storage = new IndexedDBAdapter();
+  try {
+    await storage.open();
+  } catch (err) {
+    showFatalStorageError(err);
+    return;
+  }
+
   // ---- Wire adapters into core services (this is the whole "bootstrap") ----
-  const storage = new LocalStorageAdapter();
   const encryption = new CryptoJSAdapter();
   const aiEngine = new OllamaAdapter();
 
@@ -108,11 +136,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const submitChangePwdBtn = el<HTMLButtonElement>("submit-change-pwd-btn");
   const pwdStatusMsg = el<HTMLSpanElement>("pwd-status-msg");
 
-  // A vault only exists once a password has been set on it, and exportRaw()
-  // returns falsy until that first unlock happens - reuse that same signal
-  // (rather than a separate flag) to greet brand-new users on the lock screen.
-  const isFirstTimeUser = !vaultService.exportRaw();
-  authFirstTimeHint.classList.toggle("visual-hidden", !isFirstTimeUser);
+  // A vault only exists once a password has been set on it - reuse that same
+  // signal (rather than a separate flag) to greet brand-new users on the lock
+  // screen. The hint stays hidden unless this check says there is no vault.
+  void vaultService
+    .hasVault()
+    .then((hasVault) => authFirstTimeHint.classList.toggle("visual-hidden", hasVault))
+    .catch((err) => console.error(err));
 
   // Volatile UI State
   let activeAgentProfile: AgentProfile | null = null;
@@ -148,10 +178,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Merges the pending buffer into the vault (via the core services) and
   // clears the buffer on success. Returns how many dates were merged.
-  function mergeBufferIntoVault(): number {
-    const buffer = bufferService.getAll();
-    const count = vaultService.mergeAppends(buffer);
-    if (count > 0) bufferService.clear();
+  // The buffer is cleared only after the vault write has been committed.
+  async function mergeBufferIntoVault(): Promise<number> {
+    const buffer = await bufferService.getAll();
+    const count = await vaultService.mergeAppends(buffer);
+    if (count > 0) await bufferService.clear();
     return count;
   }
 
@@ -181,24 +212,38 @@ document.addEventListener("DOMContentLoaded", () => {
       viewTitle.textContent = activeAgentProfile ? activeAgentProfile.name : "Agent Tracker";
     } else if (viewId === "view-settings") {
       viewTitle.textContent = "Settings";
-      const config = aiService.getConfig();
-      aiEndpointInput.value = config.endpoint;
-      aiModelInput.value = config.model;
+      void aiService.getConfig().then((config) => {
+        aiEndpointInput.value = config.endpoint;
+        aiModelInput.value = config.model;
+      });
       backupIoZone.classList.add("visual-hidden");
       changePwdZone.classList.add("visual-hidden");
     }
   }
 
   // --- Auth ---
-  authForm.addEventListener("submit", (e) => {
+  let unlocking = false;
+  authForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const enteredPassword = passwordInput.value.trim();
-    if (!enteredPassword) return;
+    if (!enteredPassword || unlocking) return;
+    unlocking = true;
 
-    const success = vaultService.unlock(enteredPassword);
-
+    let success = false;
     let mergedCount = 0;
-    if (success) mergedCount = mergeBufferIntoVault();
+    try {
+      success = await vaultService.unlock(enteredPassword);
+      if (success) mergedCount = await mergeBufferIntoVault();
+    } catch (err) {
+      console.error(err);
+      vaultService.lock();
+      alert(
+        `Couldn't read or write the vault in IndexedDB (${err instanceof Error ? err.message : err}). Nothing was changed; try again.`
+      );
+      return;
+    } finally {
+      unlocking = false;
+    }
 
     authModal.classList.add("visual-hidden");
     mainApp.classList.remove("visual-hidden");
@@ -241,7 +286,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (withTimestamp) {
       insertAutoTimestamp(memoryInput);
-      saveCurrentMemoryEntry();
+      void saveCurrentMemoryEntry();
     }
   }
 
@@ -249,12 +294,18 @@ document.addEventListener("DOMContentLoaded", () => {
   let memoryAutosaveTimeout: ReturnType<typeof setTimeout> | null = null;
   memoryInput.addEventListener("input", () => {
     if (memoryAutosaveTimeout) clearTimeout(memoryAutosaveTimeout);
-    memoryAutosaveTimeout = setTimeout(saveCurrentMemoryEntry, 500);
+    memoryAutosaveTimeout = setTimeout(() => void saveCurrentMemoryEntry(), 500);
   });
 
-  function saveCurrentMemoryEntry() {
+  async function saveCurrentMemoryEntry(): Promise<void> {
     const text = memoryInput.value.trim();
-    vaultService.saveEntry(currentTargetDateKey, text);
+    try {
+      await vaultService.saveEntry(currentTargetDateKey, text);
+    } catch (err) {
+      console.error(err);
+      memorySaveStatus.textContent = "⚠ Save failed";
+      return;
+    }
     displayMemories(true);
     flashSavedIndicator(memorySaveStatus);
   }
@@ -291,13 +342,18 @@ document.addEventListener("DOMContentLoaded", () => {
         window.scrollTo({ top: 0, behavior: "smooth" });
       });
 
-      card.querySelector(".delete-entry-trigger")?.addEventListener("click", () => {
+      card.querySelector(".delete-entry-trigger")?.addEventListener("click", async () => {
         if (
           confirm(
             `⚠️ DANGER: Are you sure you want to permanently delete the memory from ${memory.readableDate}? This action cannot be reversed.`
           )
         ) {
-          vaultService.deleteEntry(memory.id);
+          try {
+            await vaultService.deleteEntry(memory.id);
+          } catch (err) {
+            console.error(err);
+            alert("Couldn't save the deletion to storage. Please try again.");
+          }
           displayMemories(true);
           updateFormContext(getTodayKey());
         }
@@ -310,7 +366,12 @@ document.addEventListener("DOMContentLoaded", () => {
   // --- AGENTS LANDING PAGE VIEW MANAGEMENT ---
   function renderAgentsHub() {
     agentsListContainer.innerHTML = "";
-    const agents = aiService.listAgents();
+    if (!vaultService.isUnlocked) {
+      agentsListContainer.innerHTML =
+        "<p class='status-msg'>The vault is locked, so agents (which are stored inside it) can't be shown. Reload and unlock with the correct password.</p>";
+      return;
+    }
+    const agents = vaultService.listAgents();
     if (agents.length === 0) {
       agentsListContainer.innerHTML =
         "<p class='status-msg'>No operational analytical profiles. Hit the + FAB button to instantiate one!</p>";
@@ -337,13 +398,13 @@ document.addEventListener("DOMContentLoaded", () => {
   addAgentFab.addEventListener("click", () => createAgentModal.classList.remove("visual-hidden"));
   closeCreateModalBtn.addEventListener("click", () => createAgentModal.classList.add("visual-hidden"));
 
-  createAgentForm.addEventListener("submit", (e) => {
+  createAgentForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const name = newAgentName.value.trim().replace(/[^a-zA-Z0-9]/g, "");
     const prompt = newAgentPrompt.value.trim();
 
     try {
-      aiService.createAgent(name, prompt);
+      await vaultService.createAgent(name, prompt);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Could not create agent.");
       return;
@@ -380,20 +441,19 @@ document.addEventListener("DOMContentLoaded", () => {
     agentConfigPanel.classList.toggle("visual-hidden");
   });
 
-  saveAgentConfigBtn.addEventListener("click", () => {
+  saveAgentConfigBtn.addEventListener("click", async () => {
     if (!activeAgentProfile) return;
     const newName = editAgentName.value.trim().replace(/[^a-zA-Z0-9]/g, "");
     const newPrompt = editAgentPrompt.value.trim();
     if (!newName || !newPrompt) return;
 
     const oldName = activeAgentProfile.name;
-    if (newName !== oldName) {
-      vaultService.renameAgentInsights(oldName, newName);
-    }
 
+    // Renames the agent and moves its insights to the new name in a single
+    // vault write, so the two can't get out of sync.
     let updated: AgentProfile;
     try {
-      updated = aiService.updateAgent(oldName, newName, newPrompt);
+      updated = await vaultService.updateAgent(oldName, newName, newPrompt);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Could not update agent.");
       return;
@@ -404,7 +464,7 @@ document.addEventListener("DOMContentLoaded", () => {
     alert("Agent configuration modified successfully.");
   });
 
-  deleteAgentBtn.addEventListener("click", () => {
+  deleteAgentBtn.addEventListener("click", async () => {
     if (
       !activeAgentProfile ||
       !confirm(
@@ -413,7 +473,12 @@ document.addEventListener("DOMContentLoaded", () => {
     )
       return;
 
-    aiService.deleteAgent(activeAgentProfile.name);
+    try {
+      await vaultService.deleteAgent(activeAgentProfile.name);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Could not delete agent.");
+      return;
+    }
     activeAgentProfile = null;
     switchActiveViewPanel("view-agents");
   });
@@ -447,7 +512,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const tx = row.querySelector<HTMLTextAreaElement>(".agent-insight-edit-box")!;
       tx.addEventListener("input", () => {
-        vaultService.setInsight(entry.id, agent.name, tx.value.trim() || null);
+        vaultService
+          .setInsight(entry.id, agent.name, tx.value.trim() || null)
+          .catch((err) => console.error("Failed to save insight edit:", err));
       });
 
       row.querySelector(".single-day-run-trigger")?.addEventListener("click", async (e) => {
@@ -456,7 +523,14 @@ document.addEventListener("DOMContentLoaded", () => {
         btn.textContent = "Querying Local LLM...";
         const res = await aiService.analyze(agent, entry.text || "");
         if (res) {
-          vaultService.setInsight(entry.id, agent.name, res);
+          try {
+            await vaultService.setInsight(entry.id, agent.name, res);
+          } catch (err) {
+            console.error(err);
+            btn.disabled = false;
+            btn.textContent = "Storage failed - Retry";
+            return;
+          }
           renderAgentInsightsTimelineList();
         } else {
           btn.disabled = false;
@@ -476,17 +550,21 @@ document.addEventListener("DOMContentLoaded", () => {
     const agent = activeAgentProfile;
     batchRunBtn.disabled = true;
 
-    for (let i = 0; i < timeline.length; i++) {
-      const entry = timeline[i];
-      batchProgressMsg.textContent = `⏳ Processing: ${i + 1}/${timeline.length} (${entry.id})...`;
+    try {
+      for (let i = 0; i < timeline.length; i++) {
+        const entry = timeline[i];
+        batchProgressMsg.textContent = `⏳ Processing: ${i + 1}/${timeline.length} (${entry.id})...`;
 
-      const out = await aiService.analyze(agent, entry.text || "");
-      if (out) {
-        vaultService.setInsight(entry.id, agent.name, out);
+        const out = await aiService.analyze(agent, entry.text || "");
+        if (out) {
+          await vaultService.setInsight(entry.id, agent.name, out);
+        }
       }
+      batchProgressMsg.textContent = "✅ Batch computation completed.";
+    } catch (err) {
+      console.error(err);
+      batchProgressMsg.textContent = "⚠ Batch stopped: couldn't write to storage.";
     }
-
-    batchProgressMsg.textContent = "✅ Batch computation completed.";
     batchRunBtn.disabled = false;
     renderAgentInsightsTimelineList();
     setTimeout(() => {
@@ -494,7 +572,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }, 5000);
   });
 
-  clearInsightsBtn.addEventListener("click", () => {
+  clearInsightsBtn.addEventListener("click", async () => {
     const timeline = vaultService.getTimeline();
     if (!activeAgentProfile || timeline.length === 0) return;
     if (
@@ -504,7 +582,12 @@ document.addEventListener("DOMContentLoaded", () => {
     )
       return;
 
-    vaultService.clearAgentInsights(activeAgentProfile.name);
+    try {
+      await vaultService.clearAgentInsights(activeAgentProfile.name);
+    } catch (err) {
+      console.error(err);
+      alert("Couldn't save the cleared insights to storage. Please try again.");
+    }
     renderAgentInsightsTimelineList();
 
     csvOutputZone.classList.add("visual-hidden");
@@ -543,23 +626,36 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // --- VIEW 4 SETTINGS & CONTEXTUAL BACKUP INTERFACES ---
-  saveSettingsBtn.addEventListener("click", () => {
-    aiService.saveConfig({
-      endpoint: aiEndpointInput.value.trim().replace(/\/$/, ""),
-      model: aiModelInput.value.trim(),
-    });
+  saveSettingsBtn.addEventListener("click", async () => {
+    try {
+      await aiService.saveConfig({
+        endpoint: aiEndpointInput.value.trim().replace(/\/$/, ""),
+        model: aiModelInput.value.trim(),
+      });
+    } catch (err) {
+      console.error(err);
+      alert("Couldn't save settings to storage.");
+      return;
+    }
     alert("Global core engine settings mapped.");
   });
 
-  exportBtn.addEventListener("click", () => {
+  exportBtn.addEventListener("click", async () => {
     backupMode = "export";
     changePwdZone.classList.add("visual-hidden");
     backupIoZone.classList.remove("visual-hidden");
-    backupTextarea.value = vaultService.exportRaw() || "";
+    backupTextarea.value = "";
     backupTextarea.readOnly = true;
     backupActionSubmitBtn.textContent = "📋 Copy to Clipboard";
     backupActionSubmitBtn.className = "";
     backupStatusMsg.textContent = "";
+    try {
+      backupTextarea.value = (await vaultService.exportRaw()) || "";
+    } catch (err) {
+      console.error(err);
+      backupStatusMsg.textContent = "⚠ Couldn't read the vault from storage.";
+      return;
+    }
     backupTextarea.select();
   });
 
@@ -575,7 +671,7 @@ document.addEventListener("DOMContentLoaded", () => {
     backupStatusMsg.textContent = "";
   });
 
-  backupActionSubmitBtn.addEventListener("click", () => {
+  backupActionSubmitBtn.addEventListener("click", async () => {
     if (backupMode === "export") {
       if (!backupTextarea.value) return;
       navigator.clipboard.writeText(backupTextarea.value).then(() => {
@@ -585,7 +681,13 @@ document.addEventListener("DOMContentLoaded", () => {
       const str = backupTextarea.value.trim();
       if (!str) return;
       if (confirm("This will overwrite all current system entries with your backup text. Proceed?")) {
-        vaultService.importRaw(str);
+        try {
+          await vaultService.importRaw(str);
+        } catch (err) {
+          console.error(err);
+          backupStatusMsg.textContent = "⚠ Couldn't write the backup to storage. Nothing was changed.";
+          return;
+        }
         alert("Vault string imported successfully! App environment will now refresh.");
         window.location.reload();
       }
@@ -603,7 +705,7 @@ document.addEventListener("DOMContentLoaded", () => {
     pwdStatusMsg.style.color = "inherit";
   });
 
-  submitChangePwdBtn.addEventListener("click", () => {
+  submitChangePwdBtn.addEventListener("click", async () => {
     const oldPwd = oldPasswordInput.value.trim();
     const newPwd = newPasswordInput.value.trim();
     const confirmNewPwd = newPasswordConfirm.value.trim();
@@ -626,7 +728,15 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const changed = vaultService.changePassword(oldPwd, newPwd);
+    let changed = false;
+    try {
+      changed = await vaultService.changePassword(oldPwd, newPwd);
+    } catch (err) {
+      console.error(err);
+      pwdStatusMsg.textContent = "❌ Couldn't write the re-encrypted vault to storage. Password unchanged.";
+      pwdStatusMsg.style.color = "var(--danger)";
+      return;
+    }
     if (!changed) {
       pwdStatusMsg.textContent = "❌ Confirmed old master password validation fails.";
       pwdStatusMsg.style.color = "var(--danger)";
@@ -641,7 +751,19 @@ document.addEventListener("DOMContentLoaded", () => {
     }, 1500);
   });
 
-  lockBtn.addEventListener("click", () => window.location.reload());
+  lockBtn.addEventListener("click", async () => {
+    // Flush an autosave that's still waiting on its debounce timer, so
+    // locking right after typing doesn't drop the last half-second of text.
+    try {
+      if (memoryAutosaveTimeout) {
+        clearTimeout(memoryAutosaveTimeout);
+        memoryAutosaveTimeout = null;
+        await saveCurrentMemoryEntry();
+      }
+    } finally {
+      window.location.reload();
+    }
+  });
 
   // --- LOCK-SCREEN VIEW TOGGLE (Buffer UI <-> Unlock Form) ---
   lockViewToggleBtn.addEventListener("click", () => {
@@ -652,10 +774,12 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // --- BUFFER (APPEND-WITHOUT-PASSWORD) UI LOGIC ---
-  function updateBufferFormContext(dateKey: string, withTimestamp = false) {
+  async function updateBufferFormContext(dateKey: string, withTimestamp = false): Promise<void> {
     bufferTargetDateKey = dateKey;
     bufferCalendarPicker.value = dateKey;
-    const existingText = bufferService.getEntry(dateKey);
+    const existingText = await bufferService.getEntry(dateKey);
+    // The user picked a different date while we were reading storage.
+    if (bufferTargetDateKey !== dateKey) return;
     const isToday = dateKey === getTodayKey();
 
     bufferInput.value = existingText;
@@ -669,32 +793,38 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (withTimestamp) {
       insertAutoTimestamp(bufferInput);
-      saveCurrentBufferEntry();
+      await saveCurrentBufferEntry();
     }
   }
 
   bufferCalendarPicker.addEventListener("change", (e) => {
     const value = (e.target as HTMLInputElement).value;
-    if (value) updateBufferFormContext(value, true);
+    if (value) void updateBufferFormContext(value, true);
   });
 
   // --- AUTOSAVE: writes to the local buffer shortly after the user stops typing ---
   let bufferAutosaveTimeout: ReturnType<typeof setTimeout> | null = null;
   bufferInput.addEventListener("input", () => {
     if (bufferAutosaveTimeout) clearTimeout(bufferAutosaveTimeout);
-    bufferAutosaveTimeout = setTimeout(saveCurrentBufferEntry, 500);
+    bufferAutosaveTimeout = setTimeout(() => void saveCurrentBufferEntry(), 500);
   });
 
-  function saveCurrentBufferEntry() {
+  async function saveCurrentBufferEntry(): Promise<void> {
     const text = bufferInput.value.trim();
-    bufferService.saveEntry(bufferTargetDateKey, text);
+    try {
+      await bufferService.saveEntry(bufferTargetDateKey, text);
+    } catch (err) {
+      console.error(err);
+      bufferSaveStatus.textContent = "⚠ Save failed";
+      return;
+    }
 
-    renderBufferTimeline();
+    await renderBufferTimeline();
     flashSavedIndicator(bufferSaveStatus);
   }
 
-  function renderBufferTimeline() {
-    const buffer = bufferService.getAll();
+  async function renderBufferTimeline(): Promise<void> {
+    const buffer = await bufferService.getAll();
     const dateKeys = Object.keys(buffer)
       .filter((k) => buffer[k] && buffer[k].trim())
       .sort((a, b) => b.localeCompare(a));
@@ -721,20 +851,26 @@ document.addEventListener("DOMContentLoaded", () => {
             `;
 
       card.querySelector(".buffer-edit-trigger")?.addEventListener("click", () => {
-        updateBufferFormContext(dateKey, true);
+        void updateBufferFormContext(dateKey, true);
         bufferPanel.scrollIntoView({ behavior: "smooth", block: "start" });
       });
 
-      card.querySelector(".buffer-delete-trigger")?.addEventListener("click", () => {
+      card.querySelector(".buffer-delete-trigger")?.addEventListener("click", async () => {
         if (
           confirm(
             `⚠️ Discard the pending un-merged buffer entry for ${formatReadableDate(dateKey)}? This cannot be undone.`
           )
         ) {
-          bufferService.deleteEntry(dateKey);
-          renderBufferTimeline();
+          try {
+            await bufferService.deleteEntry(dateKey);
+          } catch (err) {
+            console.error(err);
+            alert("Couldn't delete the buffer entry from storage.");
+            return;
+          }
+          await renderBufferTimeline();
           if (bufferTargetDateKey === dateKey) {
-            updateBufferFormContext(getTodayKey());
+            await updateBufferFormContext(getTodayKey());
           }
         }
       });
@@ -745,6 +881,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Initialize the lock-screen Buffer UI immediately on app open, with today's auto-timestamp
   bufferCalendarPicker.value = getTodayKey();
-  updateBufferFormContext(getTodayKey(), true);
-  renderBufferTimeline();
+  await updateBufferFormContext(getTodayKey(), true);
+  await renderBufferTimeline();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  void bootstrap();
 });
