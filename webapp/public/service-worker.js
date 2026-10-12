@@ -7,13 +7,12 @@ const CACHE_NAME = 'daymemory-cache-v2';
 // has a hashed filename we can't list here, so it (and anything else)
 // gets cached on first fetch by the handler below instead.
 const APP_SHELL = [
-  './',
-  './index.html',
-  './style.css',
-  './crypto-js.min.js',
-  './manifest.json',
-  './icon-192.png',
-  './icon-512.png'
+  '/',
+  '/style.css',
+  '/crypto-js.min.js',
+  '/manifest.json',
+  '/icon-192.png',
+  '/icon-512.png'
 ];
 
 // Install: pre-cache the app shell.
@@ -67,7 +66,7 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => {
           if (event.request.mode === 'navigate') {
-            return caches.match('./index.html');
+            return caches.match('/');
           }
         });
     })
