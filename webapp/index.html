@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>DayMemory AI</title>
+    <title>DayMemory</title>
     <link rel="stylesheet" href="/style.css">
     <script src="/crypto-js.min.js"></script>
 
@@ -20,7 +20,7 @@
 
             <div id="auth-form-panel" class="visual-hidden">
                 <h2>Unlock Vault</h2>
-                <p>Your timeline remains zero-knowledge encrypted locally.</p>
+                <p>Your timeline remains zero-knowledge encrypted locally[cite: 19].</p>
                 <p id="auth-first-time-hint" class="status-msg visual-hidden" style="display:block; margin: -0.25rem 0 0.75rem 0; color: var(--text-muted);">Set your vault password. You can always change it in settings.</p>
                 <form id="auth-form">
                     <input type="password" id="password-input" placeholder="Master Password" required autocomplete="off">
@@ -30,7 +30,7 @@
 
             <div id="buffer-panel">
                 <h2>Quick Buffer</h2>
-                <p>Write freely without unlocking. Stored locally and unencrypted right here until you unlock the vault — then it's merged in and cleared from this buffer.</p>
+                <p>Write freely without unlocking. Stored locally and unencrypted right here until you unlock the vault — then it's merged in and cleared from this buffer[cite: 19].</p>
 
                 <div id="buffer-form" class="editor-card">
                     <label id="buffer-form-label" for="buffer-input">Quick Add for Today (Buffer):</label>
@@ -76,82 +76,10 @@
                 <div id="memories-container"></div>
             </section>
 
-            <section id="view-agents" class="nav-view-panel">
-                <div class="section-title">Your AI Insights Agents</div>
-                <div id="agents-list-container"></div>
-                <button id="add-agent-fab" class="fab-btn" title="Add New Agent">+</button>
-            </section>
-
-            <section id="view-agent-detail" class="nav-view-panel">
-                <div class="back-bar">
-                    <button id="agent-detail-back-btn" class="text-link-btn">← Back to Agents</button>
-                    <button id="agent-configure-toggle-btn" class="text-link-btn">Configure Agent ⚙️</button>
-                </div>
-
-                <div id="agent-config-panel" class="panel-box visual-hidden">
-                    <div class="input-group">
-                        <label>Agent Name</label>
-                        <input type="text" id="edit-agent-name">
-                    </div>
-                    <div class="input-group">
-                        <label>System Evaluation Prompt</label>
-                        <textarea id="edit-agent-prompt"></textarea>
-                    </div>
-                    <div class="config-actions-row">
-                        <button id="save-agent-config-btn">Save Changes</button>
-                        <button id="delete-agent-btn" class="danger-btn">Delete Agent</button>
-                    </div>
-                </div>
-
-                <div class="batch-action-banner">
-                    <div id="agent-detail-meta">
-                        <h3 id="active-agent-heading">Agent Name</h3>
-                        <p id="active-agent-prompt-preview"></p>
-                    </div>
-                    <div class="config-actions-row" style="gap: 0.5rem; width: 100%;">
-                        <button id="batch-run-btn" class="secondary-btn" style="flex: 1; margin: 0;">🚀 Run Batch Analytics (All Days)</button>
-                        <button id="clear-insights-btn" class="danger-btn" style="flex: 1; margin: 0; padding: 0.5rem;">🗑️ Clear Insights</button>
-                    </div>
-                    <div id="batch-progress-msg" class="status-msg"></div>
-                </div>
-
-                <div class="section-title">Export Data Matrix</div>
-                <div class="panel-box">
-                    <p class="section-desc">Compile this agent's generated insights history into a structured CSV format table.</p>
-                    <div class="input-group" style="margin-top: 0.5rem;">
-                        <label for="csv-headers-input">CSV Column Header Names (comma separated):</label>
-                        <input type="text" id="csv-headers-input" value="Date,Insight Text">
-                    </div>
-                    <button id="generate-csv-btn" class="secondary-btn" style="margin-bottom: 0.5rem;">📊 Generate Agent CSV</button>
-
-                    <div id="csv-output-zone" class="visual-hidden">
-                        <textarea id="csv-textarea" readonly style="min-height: 100px; font-family: monospace; font-size: 0.85rem;"></textarea>
-                        <button id="copy-csv-btn">📋 Copy CSV to Clipboard</button>
-                        <span id="csv-copy-status" class="status-msg"></span>
-                    </div>
-                </div>
-
-                <div class="section-title">Insight Records</div>
-                <div id="agent-insights-timeline"></div>
-            </section>
-
             <section id="view-settings" class="nav-view-panel">
-                <div class="section-title">Ollama Engine Parameters</div>
-                <div class="panel-box">
-                    <div class="input-group">
-                        <label for="ai-endpoint">Ollama Endpoint URL</label>
-                        <input type="url" id="ai-endpoint" placeholder="http://127.0.0.1:11434">
-                    </div>
-                    <div class="input-group">
-                        <label for="ai-model">Target Model Name</label>
-                        <input type="text" id="ai-model" placeholder="llama3">
-                    </div>
-                    <button id="save-settings-btn">Save Configurations</button>
-                </div>
-
                 <div class="section-title">Data Administration</div>
                 <div class="panel-box">
-                    <p class="section-desc">Manage encrypted vault string backups and security settings directly.</p>
+                    <p class="section-desc">Manage encrypted vault string backups and security settings directly[cite: 19].</p>
                     <div class="backup-actions" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                         <button id="export-btn" class="secondary-btn" style="flex: 1;">Export Vault String</button>
                         <button id="import-btn" class="secondary-btn" style="flex: 1;">Import Vault String</button>
@@ -186,39 +114,15 @@
         </div>
 
         <nav class="bottom-nav">
-            <button class="nav-item active" data-target="view-home">
+            <button class="nav-item active" data-target="view-home" style="width: 50%;">
                 <span class="nav-icon">🏠</span>
                 <span class="nav-label">Home</span>
             </button>
-            <button class="nav-item" data-target="view-agents">
-                <span class="nav-icon">🤖</span>
-                <span class="nav-label">Agents</span>
-            </button>
-            <button class="nav-item" data-target="view-settings">
+            <button class="nav-item" data-target="view-settings" style="width: 50%;">
                 <span class="nav-icon">⚙️</span>
                 <span class="nav-label">Settings</span>
             </button>
         </nav>
-    </div>
-
-    <div id="create-agent-modal" class="modal-overlay visual-hidden">
-        <div class="modal-content">
-            <h2>New Agent Profile</h2>
-            <form id="create-agent-form">
-                <div class="input-group">
-                    <label for="new-agent-name">Agent Name</label>
-                    <input type="text" id="new-agent-name" placeholder="e.g., MoodTracker, Summary" required>
-                </div>
-                <div class="input-group">
-                    <label for="new-agent-prompt">System Prompt Rules</label>
-                    <textarea id="new-agent-prompt" placeholder="Instruct the LLM what data points to parse..." required></textarea>
-                </div>
-                <div class="config-actions-row">
-                    <button type="submit">Create Agent</button>
-                    <button type="button" id="close-create-modal-btn" class="secondary-btn">Cancel</button>
-                </div>
-            </form>
-        </div>
     </div>
 
     <script type="module" src="/src/main.ts"></script>

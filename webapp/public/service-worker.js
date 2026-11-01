@@ -1,11 +1,8 @@
-// DayMemory AI - Service Worker
+// DayMemory - Service Worker
 // Caches the app shell so it works fully offline once installed.
 
-const CACHE_NAME = 'daymemory-cache-v2';
+const CACHE_NAME = 'daymemory-cache-v3';
 
-// Files with stable names, known ahead of time. Vite's built JS/CSS bundle
-// has a hashed filename we can't list here, so it (and anything else)
-// gets cached on first fetch by the handler below instead.
 const APP_SHELL = [
   '/',
   '/style.css',
@@ -15,7 +12,6 @@ const APP_SHELL = [
   '/icon-512.png'
 ];
 
-// Install: pre-cache the app shell.
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -24,7 +20,6 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Activate: clean up old cache versions.
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
@@ -37,19 +32,11 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch: cache-first, falling back to network, then updating the cache.
-// This also picks up Vite's hashed /assets/*.js and *.css bundle files
-// the first time they're requested, since we can't know their names in
-// advance. NOTE: this intentionally only intercepts requests for the
-// app's own static files. Any request to a different origin (e.g. a local
-// Ollama endpoint you configure in Settings) is left alone and goes
-// straight to the network, since that's a runtime API call, not part of
-// the app shell.
 self.addEventListener('fetch', (event) => {
   const requestUrl = new URL(event.request.url);
 
   if (requestUrl.origin !== self.location.origin) {
-    return; // let non-app requests (e.g. your Ollama server) pass through untouched
+    return;
   }
 
   event.respondWith(

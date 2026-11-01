@@ -1,7 +1,7 @@
 {
-  "name": "DayMemory AI",
+  "name": "DayMemory",
   "short_name": "DayMemory",
-  "description": "Zero-knowledge encrypted daily journal with local AI insight agents.",
+  "description": "Zero-knowledge encrypted daily journal.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

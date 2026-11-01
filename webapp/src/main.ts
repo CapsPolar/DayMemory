@@ -1,13 +1,10 @@
 import { VaultService } from "@core/services/VaultService";
 import { BufferService } from "@core/services/BufferService";
-import { AiService } from "@core/services/AiService";
-import type { AgentProfile } from "@core/models/Agent";
 import type { MemoryEntry } from "@core/models/Memory";
 import { getTodayKey, formatReadableDate, getTimestampString } from "@core/utils/date";
 
 import { IndexedDBAdapter } from "../adapters/IndexedDBAdapter";
 import { CryptoJSAdapter } from "../adapters/CryptoJSAdapter";
-import { OllamaAdapter } from "../adapters/OllamaAdapter";
 
 /** Replaces the lock screen with an explanation when IndexedDB can't be used. */
 function showFatalStorageError(err: unknown): void {
@@ -24,7 +21,7 @@ function showFatalStorageError(err: unknown): void {
   const body = document.createElement("p");
   body.className = "status-msg";
   body.style.display = "block";
-  body.textContent = `DayMemory keeps your vault in IndexedDB, which couldn't be opened (${message}). Your data has not been touched. Private/incognito mode or blocked site data can cause this.`;
+  body.textContent = `DayMemory keeps your vault in IndexedDB, which couldn't be opened (${message}). Your data has not been touched. Private/incognito mode or blocked site data can cause this[cite: 18].`;
   box.append(heading, body);
   modal.appendChild(box);
 }
@@ -39,13 +36,11 @@ async function bootstrap(): Promise<void> {
     return;
   }
 
-  // ---- Wire adapters into core services (this is the whole "bootstrap") ----
+  // ---- Wire adapters into core services ----
   const encryption = new CryptoJSAdapter();
-  const aiEngine = new OllamaAdapter();
 
   const vaultService = new VaultService(storage, encryption);
   const bufferService = new BufferService(storage);
-  const aiService = new AiService(storage, aiEngine);
 
   // ---- Small typed DOM helper ----
   function el<T extends HTMLElement>(id: string): T {
@@ -84,42 +79,7 @@ async function bootstrap(): Promise<void> {
   const memoriesContainer = el<HTMLDivElement>("memories-container");
   const calendarPicker = el<HTMLInputElement>("calendar-picker");
 
-  // 4. View 2 (Agents Hub) Elements
-  const agentsListContainer = el<HTMLDivElement>("agents-list-container");
-  const addAgentFab = el<HTMLButtonElement>("add-agent-fab");
-  const createAgentModal = el<HTMLDivElement>("create-agent-modal");
-  const createAgentForm = el<HTMLFormElement>("create-agent-form");
-  const newAgentName = el<HTMLInputElement>("new-agent-name");
-  const newAgentPrompt = el<HTMLTextAreaElement>("new-agent-prompt");
-  const closeCreateModalBtn = el<HTMLButtonElement>("close-create-modal-btn");
-
-  // 5. View 3 (Agent Deep Dive Drilldown View) Elements
-  const agentDetailBackBtn = el<HTMLButtonElement>("agent-detail-back-btn");
-  const agentConfigureToggleBtn = el<HTMLButtonElement>("agent-configure-toggle-btn");
-  const agentConfigPanel = el<HTMLDivElement>("agent-config-panel");
-  const editAgentName = el<HTMLInputElement>("edit-agent-name");
-  const editAgentPrompt = el<HTMLTextAreaElement>("edit-agent-prompt");
-  const saveAgentConfigBtn = el<HTMLButtonElement>("save-agent-config-btn");
-  const deleteAgentBtn = el<HTMLButtonElement>("delete-agent-btn");
-  const activeAgentHeading = el<HTMLHeadingElement>("active-agent-heading");
-  const activeAgentPromptPreview = el<HTMLParagraphElement>("active-agent-prompt-preview");
-  const batchRunBtn = el<HTMLButtonElement>("batch-run-btn");
-  const clearInsightsBtn = el<HTMLButtonElement>("clear-insights-btn");
-  const batchProgressMsg = el<HTMLDivElement>("batch-progress-msg");
-  const agentInsightsTimeline = el<HTMLDivElement>("agent-insights-timeline");
-
-  // CSV Target Elements
-  const csvHeadersInput = el<HTMLInputElement>("csv-headers-input");
-  const generateCsvBtn = el<HTMLButtonElement>("generate-csv-btn");
-  const csvOutputZone = el<HTMLDivElement>("csv-output-zone");
-  const csvTextarea = el<HTMLTextAreaElement>("csv-textarea");
-  const copyCsvBtn = el<HTMLButtonElement>("copy-csv-btn");
-  const csvCopyStatus = el<HTMLSpanElement>("csv-copy-status");
-
-  // 6. View 4 (Settings Architecture Elements)
-  const aiEndpointInput = el<HTMLInputElement>("ai-endpoint");
-  const aiModelInput = el<HTMLInputElement>("ai-model");
-  const saveSettingsBtn = el<HTMLButtonElement>("save-settings-btn");
+  // 4. View 2 (Settings Architecture Elements)
   const exportBtn = el<HTMLButtonElement>("export-btn");
   const importBtn = el<HTMLButtonElement>("import-btn");
   const changePwdBtn = el<HTMLButtonElement>("change-pwd-btn");
@@ -136,16 +96,12 @@ async function bootstrap(): Promise<void> {
   const submitChangePwdBtn = el<HTMLButtonElement>("submit-change-pwd-btn");
   const pwdStatusMsg = el<HTMLSpanElement>("pwd-status-msg");
 
-  // A vault only exists once a password has been set on it - reuse that same
-  // signal (rather than a separate flag) to greet brand-new users on the lock
-  // screen. The hint stays hidden unless this check says there is no vault.
   void vaultService
     .hasVault()
     .then((hasVault) => authFirstTimeHint.classList.toggle("visual-hidden", hasVault))
     .catch((err) => console.error(err));
 
   // Volatile UI State
-  let activeAgentProfile: AgentProfile | null = null;
   let currentTargetDateKey = getTodayKey();
   let bufferTargetDateKey = getTodayKey();
   let backupMode: "export" | "import" = "export";
@@ -176,9 +132,6 @@ async function bootstrap(): Promise<void> {
     savedIndicatorTimeouts.set(target, t);
   }
 
-  // Merges the pending buffer into the vault (via the core services) and
-  // clears the buffer on success. Returns how many dates were merged.
-  // The buffer is cleared only after the vault write has been committed.
   async function mergeBufferIntoVault(): Promise<number> {
     const buffer = await bufferService.getAll();
     const count = await vaultService.mergeAppends(buffer);
@@ -186,7 +139,7 @@ async function bootstrap(): Promise<void> {
     return count;
   }
 
-  // --- Tab-Switching & View Management System (Mobile Routing Engine) ---
+  // --- Tab-Switching & View Management System ---
   navItems.forEach((item) => {
     item.addEventListener("click", () => {
       const targetViewId = item.getAttribute("data-target");
@@ -205,17 +158,8 @@ async function bootstrap(): Promise<void> {
 
     if (viewId === "view-home") {
       viewTitle.textContent = "Home";
-    } else if (viewId === "view-agents") {
-      viewTitle.textContent = "AI Agents";
-      renderAgentsHub();
-    } else if (viewId === "view-agent-detail") {
-      viewTitle.textContent = activeAgentProfile ? activeAgentProfile.name : "Agent Tracker";
     } else if (viewId === "view-settings") {
       viewTitle.textContent = "Settings";
-      void aiService.getConfig().then((config) => {
-        aiEndpointInput.value = config.endpoint;
-        aiModelInput.value = config.model;
-      });
       backupIoZone.classList.add("visual-hidden");
       changePwdZone.classList.add("visual-hidden");
     }
@@ -256,13 +200,13 @@ async function bootstrap(): Promise<void> {
     if (mergedCount > 0) {
       setTimeout(() => {
         alert(
-          `✅ ${mergedCount} pending buffer ${mergedCount === 1 ? "entry has" : "entries have"} been merged and securely encrypted into your vault. The local buffer is now cleared.`
+          `✅ ${mergedCount} pending buffer ${mergedCount === 1 ? "entry has" : "entries have"} been merged and securely encrypted into your vault. The local buffer is now cleared[cite: 18].`
         );
       }, 150);
     }
   });
 
-  // --- HOME VIEW LOGIC (Timeline Updates with Calendar Extensions) ---
+  // --- HOME VIEW LOGIC ---
   calendarPicker.addEventListener("change", (e) => {
     const value = (e.target as HTMLInputElement).value;
     if (value) updateFormContext(value, true);
@@ -290,7 +234,6 @@ async function bootstrap(): Promise<void> {
     }
   }
 
-  // --- AUTOSAVE: writes to the vault shortly after the user stops typing ---
   let memoryAutosaveTimeout: ReturnType<typeof setTimeout> | null = null;
   memoryInput.addEventListener("input", () => {
     if (memoryAutosaveTimeout) clearTimeout(memoryAutosaveTimeout);
@@ -363,283 +306,7 @@ async function bootstrap(): Promise<void> {
     });
   }
 
-  // --- AGENTS LANDING PAGE VIEW MANAGEMENT ---
-  function renderAgentsHub() {
-    agentsListContainer.innerHTML = "";
-    if (!vaultService.isUnlocked) {
-      agentsListContainer.innerHTML =
-        "<p class='status-msg'>The vault is locked, so agents (which are stored inside it) can't be shown. Reload and unlock with the correct password.</p>";
-      return;
-    }
-    const agents = vaultService.listAgents();
-    if (agents.length === 0) {
-      agentsListContainer.innerHTML =
-        "<p class='status-msg'>No operational analytical profiles. Hit the + FAB button to instantiate one!</p>";
-      return;
-    }
-
-    agents.forEach((profile) => {
-      const card = document.createElement("div");
-      card.className = "agent-row-card";
-      card.innerHTML = `
-                <div>
-                    <div class="agent-row-title">${profile.name}</div>
-                    <p style="font-size:0.8rem; color:var(--text-muted); max-width:220px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${profile.prompt}</p>
-                </div>
-                <button class="secondary-btn open-agent-btn" style="width:auto; padding:0.4rem 0.8rem; font-size:0.85rem;">Open →</button>
-            `;
-      card.querySelector(".open-agent-btn")?.addEventListener("click", () => {
-        openAgentSubProfileView(profile);
-      });
-      agentsListContainer.appendChild(card);
-    });
-  }
-
-  addAgentFab.addEventListener("click", () => createAgentModal.classList.remove("visual-hidden"));
-  closeCreateModalBtn.addEventListener("click", () => createAgentModal.classList.add("visual-hidden"));
-
-  createAgentForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const name = newAgentName.value.trim().replace(/[^a-zA-Z0-9]/g, "");
-    const prompt = newAgentPrompt.value.trim();
-
-    try {
-      await vaultService.createAgent(name, prompt);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Could not create agent.");
-      return;
-    }
-
-    newAgentName.value = "";
-    newAgentPrompt.value = "";
-    createAgentModal.classList.add("visual-hidden");
-    renderAgentsHub();
-  });
-
-  // --- NESTED AGENT SUB-PAGE TRACKER VIEW ---
-  function openAgentSubProfileView(profile: AgentProfile) {
-    activeAgentProfile = profile;
-    agentConfigPanel.classList.add("visual-hidden");
-    csvOutputZone.classList.add("visual-hidden");
-    switchActiveViewPanel("view-agent-detail");
-
-    activeAgentHeading.textContent = profile.name;
-    activeAgentPromptPreview.textContent = `Prompt: "${profile.prompt}"`;
-
-    editAgentName.value = profile.name;
-    editAgentPrompt.value = profile.prompt;
-
-    renderAgentInsightsTimelineList();
-  }
-
-  agentDetailBackBtn.addEventListener("click", () => {
-    activeAgentProfile = null;
-    switchActiveViewPanel("view-agents");
-  });
-
-  agentConfigureToggleBtn.addEventListener("click", () => {
-    agentConfigPanel.classList.toggle("visual-hidden");
-  });
-
-  saveAgentConfigBtn.addEventListener("click", async () => {
-    if (!activeAgentProfile) return;
-    const newName = editAgentName.value.trim().replace(/[^a-zA-Z0-9]/g, "");
-    const newPrompt = editAgentPrompt.value.trim();
-    if (!newName || !newPrompt) return;
-
-    const oldName = activeAgentProfile.name;
-
-    // Renames the agent and moves its insights to the new name in a single
-    // vault write, so the two can't get out of sync.
-    let updated: AgentProfile;
-    try {
-      updated = await vaultService.updateAgent(oldName, newName, newPrompt);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Could not update agent.");
-      return;
-    }
-
-    activeAgentProfile = updated;
-    openAgentSubProfileView(activeAgentProfile);
-    alert("Agent configuration modified successfully.");
-  });
-
-  deleteAgentBtn.addEventListener("click", async () => {
-    if (
-      !activeAgentProfile ||
-      !confirm(
-        `Delete all profile criteria definitions for agent: ${activeAgentProfile.name}? Historic generations data properties will remain conserved.`
-      )
-    )
-      return;
-
-    try {
-      await vaultService.deleteAgent(activeAgentProfile.name);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Could not delete agent.");
-      return;
-    }
-    activeAgentProfile = null;
-    switchActiveViewPanel("view-agents");
-  });
-
-  function renderAgentInsightsTimelineList() {
-    agentInsightsTimeline.innerHTML = "";
-    if (!activeAgentProfile) return;
-
-    const timeline = vaultService.getTimeline();
-    if (timeline.length === 0) {
-      agentInsightsTimeline.innerHTML = "<p class='status-msg'>Timeline history blank.</p>";
-      return;
-    }
-
-    const agent = activeAgentProfile;
-
-    timeline.forEach((entry: MemoryEntry) => {
-      const row = document.createElement("div");
-      row.className = "panel-box";
-
-      const insightText = entry.aiInsights?.[agent.name] || "";
-
-      row.innerHTML = `
-                <div class="memory-card-header">
-                    <div>${entry.readableDate}</div>
-                    <button class="text-link-btn single-day-run-trigger">${insightText ? "🔄 Re-Analyze" : "✨ Analyze Day"}</button>
-                </div>
-                <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:0.5rem; background:rgba(0,0,0,0.02); padding:0.4rem; border-radius:4px;">Log: "${entry.text || "(No entry text added)"}"</div>
-                <textarea class="agent-insight-edit-box" placeholder="No insight output logged. Click 'Analyze' to query model...">${insightText}</textarea>
-            `;
-
-      const tx = row.querySelector<HTMLTextAreaElement>(".agent-insight-edit-box")!;
-      tx.addEventListener("input", () => {
-        vaultService
-          .setInsight(entry.id, agent.name, tx.value.trim() || null)
-          .catch((err) => console.error("Failed to save insight edit:", err));
-      });
-
-      row.querySelector(".single-day-run-trigger")?.addEventListener("click", async (e) => {
-        const btn = e.target as HTMLButtonElement;
-        btn.disabled = true;
-        btn.textContent = "Querying Local LLM...";
-        const res = await aiService.analyze(agent, entry.text || "");
-        if (res) {
-          try {
-            await vaultService.setInsight(entry.id, agent.name, res);
-          } catch (err) {
-            console.error(err);
-            btn.disabled = false;
-            btn.textContent = "Storage failed - Retry";
-            return;
-          }
-          renderAgentInsightsTimelineList();
-        } else {
-          btn.disabled = false;
-          btn.textContent = "Run Failed - Retry";
-        }
-      });
-
-      agentInsightsTimeline.appendChild(row);
-    });
-  }
-
-  batchRunBtn.addEventListener("click", async () => {
-    const timeline = vaultService.getTimeline();
-    if (timeline.length === 0 || !activeAgentProfile) return;
-    if (!confirm(`Initialize asynchronous batch sequencing through all ${timeline.length} history slots?`)) return;
-
-    const agent = activeAgentProfile;
-    batchRunBtn.disabled = true;
-
-    try {
-      for (let i = 0; i < timeline.length; i++) {
-        const entry = timeline[i];
-        batchProgressMsg.textContent = `⏳ Processing: ${i + 1}/${timeline.length} (${entry.id})...`;
-
-        const out = await aiService.analyze(agent, entry.text || "");
-        if (out) {
-          await vaultService.setInsight(entry.id, agent.name, out);
-        }
-      }
-      batchProgressMsg.textContent = "✅ Batch computation completed.";
-    } catch (err) {
-      console.error(err);
-      batchProgressMsg.textContent = "⚠ Batch stopped: couldn't write to storage.";
-    }
-    batchRunBtn.disabled = false;
-    renderAgentInsightsTimelineList();
-    setTimeout(() => {
-      batchProgressMsg.textContent = "";
-    }, 5000);
-  });
-
-  clearInsightsBtn.addEventListener("click", async () => {
-    const timeline = vaultService.getTimeline();
-    if (!activeAgentProfile || timeline.length === 0) return;
-    if (
-      !confirm(
-        `Are you sure you want to permanently clear all generated insight metrics for the agent: "${activeAgentProfile.name}" across all historical days?`
-      )
-    )
-      return;
-
-    try {
-      await vaultService.clearAgentInsights(activeAgentProfile.name);
-    } catch (err) {
-      console.error(err);
-      alert("Couldn't save the cleared insights to storage. Please try again.");
-    }
-    renderAgentInsightsTimelineList();
-
-    csvOutputZone.classList.add("visual-hidden");
-
-    batchProgressMsg.textContent = "🗑️ All insights for this agent cleared.";
-    setTimeout(() => {
-      batchProgressMsg.textContent = "";
-    }, 4000);
-  });
-
-  // --- CSV EXPORT ---
-  generateCsvBtn.addEventListener("click", () => {
-    const timeline = vaultService.getTimeline();
-    if (!activeAgentProfile || timeline.length === 0) return;
-
-    const baseHeaders = csvHeadersInput.value.trim();
-    if (!baseHeaders) {
-      alert("Please provide valid column headers.");
-      return;
-    }
-
-    csvTextarea.value = aiService.generateCsv(baseHeaders, timeline, activeAgentProfile.name);
-    csvOutputZone.classList.remove("visual-hidden");
-    csvCopyStatus.textContent = "";
-    csvTextarea.select();
-  });
-
-  copyCsvBtn.addEventListener("click", () => {
-    if (!csvTextarea.value) return;
-    navigator.clipboard.writeText(csvTextarea.value).then(() => {
-      csvCopyStatus.textContent = "CSV matrix copied to clipboard!";
-      setTimeout(() => {
-        csvCopyStatus.textContent = "";
-      }, 3000);
-    });
-  });
-
-  // --- VIEW 4 SETTINGS & CONTEXTUAL BACKUP INTERFACES ---
-  saveSettingsBtn.addEventListener("click", async () => {
-    try {
-      await aiService.saveConfig({
-        endpoint: aiEndpointInput.value.trim().replace(/\/$/, ""),
-        model: aiModelInput.value.trim(),
-      });
-    } catch (err) {
-      console.error(err);
-      alert("Couldn't save settings to storage.");
-      return;
-    }
-    alert("Global core engine settings mapped.");
-  });
-
+  // --- SETTINGS & BACKUP INTERFACES ---
   exportBtn.addEventListener("click", async () => {
     backupMode = "export";
     changePwdZone.classList.add("visual-hidden");
@@ -752,8 +419,6 @@ async function bootstrap(): Promise<void> {
   });
 
   lockBtn.addEventListener("click", async () => {
-    // Flush an autosave that's still waiting on its debounce timer, so
-    // locking right after typing doesn't drop the last half-second of text.
     try {
       if (memoryAutosaveTimeout) {
         clearTimeout(memoryAutosaveTimeout);
@@ -765,7 +430,7 @@ async function bootstrap(): Promise<void> {
     }
   });
 
-  // --- LOCK-SCREEN VIEW TOGGLE (Buffer UI <-> Unlock Form) ---
+  // --- LOCK-SCREEN VIEW TOGGLE ---
   lockViewToggleBtn.addEventListener("click", () => {
     const bufferCurrentlyShown = !bufferPanel.classList.contains("visual-hidden");
     bufferPanel.classList.toggle("visual-hidden", bufferCurrentlyShown);
@@ -773,12 +438,11 @@ async function bootstrap(): Promise<void> {
     lockViewToggleBtn.textContent = bufferCurrentlyShown ? "📝 Switch to Buffer" : "🔑 Switch to Unlock";
   });
 
-  // --- BUFFER (APPEND-WITHOUT-PASSWORD) UI LOGIC ---
+  // --- BUFFER UI LOGIC ---
   async function updateBufferFormContext(dateKey: string, withTimestamp = false): Promise<void> {
     bufferTargetDateKey = dateKey;
     bufferCalendarPicker.value = dateKey;
     const existingText = await bufferService.getEntry(dateKey);
-    // The user picked a different date while we were reading storage.
     if (bufferTargetDateKey !== dateKey) return;
     const isToday = dateKey === getTodayKey();
 
@@ -802,7 +466,6 @@ async function bootstrap(): Promise<void> {
     if (value) void updateBufferFormContext(value, true);
   });
 
-  // --- AUTOSAVE: writes to the local buffer shortly after the user stops typing ---
   let bufferAutosaveTimeout: ReturnType<typeof setTimeout> | null = null;
   bufferInput.addEventListener("input", () => {
     if (bufferAutosaveTimeout) clearTimeout(bufferAutosaveTimeout);
@@ -832,7 +495,7 @@ async function bootstrap(): Promise<void> {
     bufferTimelineContainer.innerHTML = "";
 
     if (dateKeys.length === 0) {
-      bufferTimelineContainer.innerHTML = `<p class="status-msg">No pending buffer entries. Anything you write here stays local and unencrypted until you unlock the vault.</p>`;
+      bufferTimelineContainer.innerHTML = `<p class="status-msg">No pending buffer entries. Anything you write here stays local and unencrypted until you unlock the vault[cite: 18].</p>`;
       return;
     }
 
@@ -879,7 +542,6 @@ async function bootstrap(): Promise<void> {
     });
   }
 
-  // Initialize the lock-screen Buffer UI immediately on app open, with today's auto-timestamp
   bufferCalendarPicker.value = getTodayKey();
   await updateBufferFormContext(getTodayKey(), true);
   await renderBufferTimeline();
