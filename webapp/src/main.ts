@@ -1,7 +1,6 @@
 import { VaultService } from "@core/services/VaultService";
 import { BufferService } from "@core/services/BufferService";
-import type { MemoryEntry } from "@core/models/Memory";
-import { getTodayKey, formatReadableDate, getTimestampString } from "@core/utils/date";
+import { getTimestampString } from "@core/utils/date";
 
 import { IndexedDBAdapter } from "../adapters/IndexedDBAdapter";
 import { CryptoJSAdapter } from "../adapters/CryptoJSAdapter";
@@ -21,7 +20,7 @@ function showFatalStorageError(err: unknown): void {
   const body = document.createElement("p");
   body.className = "status-msg";
   body.style.display = "block";
-  body.textContent = `DayMemory keeps your vault in IndexedDB, which couldn't be opened (${message}). Your data has not been touched. Private/incognito mode or blocked site data can cause this[cite: 18].`;
+  body.textContent = `DayMemory keeps your vault in IndexedDB, which couldn't be opened (${message}). Your data has not been touched. Private/incognito mode or blocked site data can cause this.`;
   box.append(heading, body);
   modal.appendChild(box);
 }
@@ -67,17 +66,11 @@ async function bootstrap(): Promise<void> {
   const authFormPanel = el<HTMLDivElement>("auth-form-panel");
   const bufferPanel = el<HTMLDivElement>("buffer-panel");
   const bufferInput = el<HTMLTextAreaElement>("buffer-input");
-  const bufferFormLabel = el<HTMLLabelElement>("buffer-form-label");
   const bufferSaveStatus = el<HTMLSpanElement>("buffer-save-status");
-  const bufferCalendarPicker = el<HTMLInputElement>("buffer-calendar-picker");
-  const bufferTimelineContainer = el<HTMLDivElement>("buffer-timeline-container");
 
   // 3. View 1 (Home) Elements
   const memoryInput = el<HTMLTextAreaElement>("memory-input");
-  const formLabel = el<HTMLLabelElement>("form-label");
   const memorySaveStatus = el<HTMLSpanElement>("memory-save-status");
-  const memoriesContainer = el<HTMLDivElement>("memories-container");
-  const calendarPicker = el<HTMLInputElement>("calendar-picker");
 
   // 4. View 2 (Settings Architecture Elements)
   const exportBtn = el<HTMLButtonElement>("export-btn");
@@ -102,22 +95,7 @@ async function bootstrap(): Promise<void> {
     .catch((err) => console.error(err));
 
   // Volatile UI State
-  let currentTargetDateKey = getTodayKey();
-  let bufferTargetDateKey = getTodayKey();
   let backupMode: "export" | "import" = "export";
-
-  function insertAutoTimestamp(textareaEl: HTMLTextAreaElement) {
-    const stamp = getTimestampString();
-    const current = textareaEl.value;
-    if (!current.trim()) {
-      textareaEl.value = stamp;
-    } else {
-      textareaEl.value = current.replace(/\s+$/, "") + "\n\n" + stamp;
-    }
-    textareaEl.focus();
-    const endPos = textareaEl.value.length;
-    textareaEl.setSelectionRange(endPos, endPos);
-  }
 
   // --- AUTOSAVE STATUS INDICATOR HELPER ---
   const savedIndicatorTimeouts = new WeakMap<HTMLElement, ReturnType<typeof setTimeout>>();
@@ -132,11 +110,12 @@ async function bootstrap(): Promise<void> {
     savedIndicatorTimeouts.set(target, t);
   }
 
-  async function mergeBufferIntoVault(): Promise<number> {
-    const buffer = await bufferService.getAll();
-    const count = await vaultService.mergeAppends(buffer);
-    if (count > 0) await bufferService.clear();
-    return count;
+  async function mergeBufferIntoVault(): Promise<boolean> {
+    const pendingText = await bufferService.getBuffer();
+    if (!pendingText.trim()) return false;
+    await vaultService.appendContent(pendingText);
+    await bufferService.clear();
+    return true;
   }
 
   // --- Tab-Switching & View Management System ---
@@ -157,7 +136,7 @@ async function bootstrap(): Promise<void> {
     activePanel?.classList.add("active");
 
     if (viewId === "view-home") {
-      viewTitle.textContent = "Home";
+      viewTitle.textContent = "Thoughts";
     } else if (viewId === "view-settings") {
       viewTitle.textContent = "Settings";
       backupIoZone.classList.add("visual-hidden");
@@ -174,10 +153,10 @@ async function bootstrap(): Promise<void> {
     unlocking = true;
 
     let success = false;
-    let mergedCount = 0;
+    let merged = false;
     try {
       success = await vaultService.unlock(enteredPassword);
-      if (success) mergedCount = await mergeBufferIntoVault();
+      if (success) merged = await mergeBufferIntoVault();
     } catch (err) {
       console.error(err);
       vaultService.lock();
@@ -192,118 +171,37 @@ async function bootstrap(): Promise<void> {
     authModal.classList.add("visual-hidden");
     mainApp.classList.remove("visual-hidden");
 
-    calendarPicker.value = getTodayKey();
+    if (success) {
+      memoryInput.value = vaultService.getContent();
+    }
 
-    displayMemories(success);
-    if (success) updateFormContext(getTodayKey(), true);
-
-    if (mergedCount > 0) {
+    if (merged) {
       setTimeout(() => {
         alert(
-          `✅ ${mergedCount} pending buffer ${mergedCount === 1 ? "entry has" : "entries have"} been merged and securely encrypted into your vault. The local buffer is now cleared[cite: 18].`
+          `✅ Your pending buffer entries have been merged and securely encrypted into your vault. The local buffer is now cleared.`
         );
+        memoryInput.value = vaultService.getContent();
       }, 150);
     }
   });
 
   // --- HOME VIEW LOGIC ---
-  calendarPicker.addEventListener("change", (e) => {
-    const value = (e.target as HTMLInputElement).value;
-    if (value) updateFormContext(value, true);
-  });
-
-  function updateFormContext(dateKey: string, withTimestamp = false) {
-    currentTargetDateKey = dateKey;
-    calendarPicker.value = dateKey;
-    const existingEntry = vaultService.getEntry(dateKey);
-    const isToday = dateKey === getTodayKey();
-
-    if (existingEntry) {
-      memoryInput.value = existingEntry.text;
-      formLabel.textContent = isToday
-        ? `Editing Today (${formatReadableDate(dateKey)}):`
-        : `Editing Entry for ${formatReadableDate(dateKey)}:`;
-    } else {
-      memoryInput.value = "";
-      formLabel.textContent = `Write about Today (${formatReadableDate(dateKey)}):`;
-    }
-
-    if (withTimestamp) {
-      insertAutoTimestamp(memoryInput);
-      void saveCurrentMemoryEntry();
-    }
-  }
-
   let memoryAutosaveTimeout: ReturnType<typeof setTimeout> | null = null;
   memoryInput.addEventListener("input", () => {
     if (memoryAutosaveTimeout) clearTimeout(memoryAutosaveTimeout);
-    memoryAutosaveTimeout = setTimeout(() => void saveCurrentMemoryEntry(), 500);
+    memoryAutosaveTimeout = setTimeout(() => void saveCurrentContent(), 500);
   });
 
-  async function saveCurrentMemoryEntry(): Promise<void> {
-    const text = memoryInput.value.trim();
+  async function saveCurrentContent(): Promise<void> {
+    const text = memoryInput.value;
     try {
-      await vaultService.saveEntry(currentTargetDateKey, text);
+      await vaultService.saveContent(text);
     } catch (err) {
       console.error(err);
       memorySaveStatus.textContent = "⚠ Save failed";
       return;
     }
-    displayMemories(true);
     flashSavedIndicator(memorySaveStatus);
-  }
-
-  function displayMemories(isSuccess: boolean) {
-    memoriesContainer.innerHTML = "";
-    if (!isSuccess) {
-      memoriesContainer.innerHTML = `<div class="panel-box" style="border-left:4px solid var(--danger); font-style:italic;">[Incorrect password or corrupted data framework.]</div>`;
-      return;
-    }
-
-    const timeline = vaultService.getTimeline();
-    if (timeline.length === 0) {
-      memoriesContainer.innerHTML = `<p class="status-msg">Your vault is clean. Write down your first memory above!</p>`;
-      return;
-    }
-
-    timeline.forEach((memory: MemoryEntry) => {
-      const card = document.createElement("div");
-      card.className = "memory-card";
-      card.innerHTML = `
-                <div class="memory-card-header">
-                    <div>${memory.readableDate}</div>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <button class="text-link-btn edit-entry-trigger">Edit</button>
-                        <button class="text-link-btn delete-entry-trigger" style="color: var(--danger);">Delete</button>
-                    </div>
-                </div>
-                <div class="memory-text">${memory.text || '<span style="color:var(--text-muted); font-style:italic;">[Empty entry block - click edit to write]</span>'}</div>
-            `;
-
-      card.querySelector(".edit-entry-trigger")?.addEventListener("click", () => {
-        updateFormContext(memory.id, true);
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      });
-
-      card.querySelector(".delete-entry-trigger")?.addEventListener("click", async () => {
-        if (
-          confirm(
-            `⚠️ DANGER: Are you sure you want to permanently delete the memory from ${memory.readableDate}? This action cannot be reversed.`
-          )
-        ) {
-          try {
-            await vaultService.deleteEntry(memory.id);
-          } catch (err) {
-            console.error(err);
-            alert("Couldn't save the deletion to storage. Please try again.");
-          }
-          displayMemories(true);
-          updateFormContext(getTodayKey());
-        }
-      });
-
-      memoriesContainer.appendChild(card);
-    });
   }
 
   // --- SETTINGS & BACKUP INTERFACES ---
@@ -332,7 +230,7 @@ async function bootstrap(): Promise<void> {
     backupIoZone.classList.remove("visual-hidden");
     backupTextarea.value = "";
     backupTextarea.readOnly = false;
-    backupTextarea.placeholder = "Paste raw encrypted string structure blocks here for timeline state restoration...";
+    backupTextarea.placeholder = "Paste raw encrypted string structure blocks here for state restoration...";
     backupActionSubmitBtn.textContent = "🔥 Restore Backup (Overwrite)";
     backupActionSubmitBtn.className = "danger-btn";
     backupStatusMsg.textContent = "";
@@ -423,7 +321,7 @@ async function bootstrap(): Promise<void> {
       if (memoryAutosaveTimeout) {
         clearTimeout(memoryAutosaveTimeout);
         memoryAutosaveTimeout = null;
-        await saveCurrentMemoryEntry();
+        await saveCurrentContent();
       }
     } finally {
       window.location.reload();
@@ -439,112 +337,25 @@ async function bootstrap(): Promise<void> {
   });
 
   // --- BUFFER UI LOGIC ---
-  async function updateBufferFormContext(dateKey: string, withTimestamp = false): Promise<void> {
-    bufferTargetDateKey = dateKey;
-    bufferCalendarPicker.value = dateKey;
-    const existingText = await bufferService.getEntry(dateKey);
-    if (bufferTargetDateKey !== dateKey) return;
-    const isToday = dateKey === getTodayKey();
-
-    bufferInput.value = existingText;
-    if (existingText) {
-      bufferFormLabel.textContent = `Editing Pending Buffer for ${formatReadableDate(dateKey)}:`;
-    } else {
-      bufferFormLabel.textContent = isToday
-        ? `Quick Add for Today (${formatReadableDate(dateKey)}):`
-        : `Quick Add for ${formatReadableDate(dateKey)}:`;
-    }
-
-    if (withTimestamp) {
-      insertAutoTimestamp(bufferInput);
-      await saveCurrentBufferEntry();
-    }
-  }
-
-  bufferCalendarPicker.addEventListener("change", (e) => {
-    const value = (e.target as HTMLInputElement).value;
-    if (value) void updateBufferFormContext(value, true);
-  });
+  bufferInput.value = await bufferService.getBuffer();
 
   let bufferAutosaveTimeout: ReturnType<typeof setTimeout> | null = null;
   bufferInput.addEventListener("input", () => {
     if (bufferAutosaveTimeout) clearTimeout(bufferAutosaveTimeout);
-    bufferAutosaveTimeout = setTimeout(() => void saveCurrentBufferEntry(), 500);
+    bufferAutosaveTimeout = setTimeout(() => void saveCurrentBuffer(), 500);
   });
 
-  async function saveCurrentBufferEntry(): Promise<void> {
-    const text = bufferInput.value.trim();
+  async function saveCurrentBuffer(): Promise<void> {
+    const text = bufferInput.value;
     try {
-      await bufferService.saveEntry(bufferTargetDateKey, text);
+      await bufferService.saveBuffer(text);
     } catch (err) {
       console.error(err);
       bufferSaveStatus.textContent = "⚠ Save failed";
       return;
     }
-
-    await renderBufferTimeline();
     flashSavedIndicator(bufferSaveStatus);
   }
-
-  async function renderBufferTimeline(): Promise<void> {
-    const buffer = await bufferService.getAll();
-    const dateKeys = Object.keys(buffer)
-      .filter((k) => buffer[k] && buffer[k].trim())
-      .sort((a, b) => b.localeCompare(a));
-
-    bufferTimelineContainer.innerHTML = "";
-
-    if (dateKeys.length === 0) {
-      bufferTimelineContainer.innerHTML = `<p class="status-msg">No pending buffer entries. Anything you write here stays local and unencrypted until you unlock the vault[cite: 18].</p>`;
-      return;
-    }
-
-    dateKeys.forEach((dateKey) => {
-      const card = document.createElement("div");
-      card.className = "memory-card";
-      card.innerHTML = `
-                <div class="memory-card-header">
-                    <div>${formatReadableDate(dateKey)} <span style="font-size:0.75rem; color: var(--text-muted);">(pending, unencrypted)</span></div>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <button class="text-link-btn buffer-edit-trigger">Edit</button>
-                        <button class="text-link-btn buffer-delete-trigger" style="color: var(--danger);">Delete</button>
-                    </div>
-                </div>
-                <div class="memory-text">${buffer[dateKey]}</div>
-            `;
-
-      card.querySelector(".buffer-edit-trigger")?.addEventListener("click", () => {
-        void updateBufferFormContext(dateKey, true);
-        bufferPanel.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
-
-      card.querySelector(".buffer-delete-trigger")?.addEventListener("click", async () => {
-        if (
-          confirm(
-            `⚠️ Discard the pending un-merged buffer entry for ${formatReadableDate(dateKey)}? This cannot be undone.`
-          )
-        ) {
-          try {
-            await bufferService.deleteEntry(dateKey);
-          } catch (err) {
-            console.error(err);
-            alert("Couldn't delete the buffer entry from storage.");
-            return;
-          }
-          await renderBufferTimeline();
-          if (bufferTargetDateKey === dateKey) {
-            await updateBufferFormContext(getTodayKey());
-          }
-        }
-      });
-
-      bufferTimelineContainer.appendChild(card);
-    });
-  }
-
-  bufferCalendarPicker.value = getTodayKey();
-  await updateBufferFormContext(getTodayKey(), true);
-  await renderBufferTimeline();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
