@@ -1,30 +1,15 @@
 import type { StoragePort } from "../ports/StoragePort";
 import type { EncryptionPort } from "../ports/EncryptionPort";
-import { formatReadableDate } from "../utils/date";
-
-export interface MemoryEntry {
-  id: string;
-  text: string;
-  readableDate: string;
-}
-
-export type Timeline = MemoryEntry[];
-
-export const VAULT_FORMAT_VERSION = 3; // Bump version to drop agents/insights schema
-
-export interface VaultData {
-  version: number;
-  timeline: Timeline;
-}
+import { VAULT_FORMAT_VERSION, parseVaultData, type VaultData } from "../models/Vault";
 
 const VAULT_KEY = "dayMemoryVault";
 
 /**
- * Owns the decrypted, in-memory timeline and all read/write operations.
- * Completely stripped of AI agents and network dependencies.
+ * Owns the decrypted, in-memory continuous text string and all read/write operations.
+ * Completely stripped of date partitioning, timeline arrays, and AI agents[cite: 6].
  */
 export class VaultService {
-  private timeline: Timeline = [];
+  private content: string = "";
   private sessionKey: string | null = null;
 
   private dirty = false;
@@ -48,86 +33,49 @@ export class VaultService {
 
     let data: VaultData;
     if (!encrypted) {
-      data = { version: VAULT_FORMAT_VERSION, timeline: [] };
+      data = { version: VAULT_FORMAT_VERSION, content: "" };
     } else {
       const decrypted = this.encryption.decrypt(encrypted, password);
       if (decrypted === null) return false;
 
-      let parsed: unknown;
       try {
-        parsed = JSON.parse(decrypted);
+        const parsed = JSON.parse(decrypted);
+        data = parseVaultData(parsed, decrypted);
       } catch {
-        return false;
+        // Unformatted plain text or raw non-JSON string -> treat as-is
+        data = { version: VAULT_FORMAT_VERSION, content: decrypted };
       }
-      
-      if (typeof parsed !== "object" || parsed === null) return false;
-      const obj = parsed as Record<string, unknown>;
-      
-      // Basic validation for timeline structure
-      if (!Array.isArray(obj.timeline)) return false;
-      data = { version: VAULT_FORMAT_VERSION, timeline: obj.timeline as Timeline };
     }
 
-    this.timeline = data.timeline;
+    this.content = data.content;
     this.sessionKey = password;
     return true;
   }
 
   lock(): void {
     this.sessionKey = null;
-    this.timeline = [];
+    this.content = "";
     this.dirty = false;
   }
 
-  getTimeline(): Timeline {
-    return [...this.timeline].sort((a, b) => b.id.localeCompare(a.id));
+  getContent(): string {
+    return this.content;
   }
 
-  getEntry(dateKey: string): MemoryEntry | undefined {
-    return this.timeline.find((e: MemoryEntry) => e.id === dateKey);
-  }
-
-  saveEntry(dateKey: string, text: string): Promise<void> {
-    const existing = this.timeline.find((e: MemoryEntry) => e.id === dateKey);
-    if (existing) {
-      existing.text = text;
-    } else {
-      this.timeline.push({
-        id: dateKey,
-        text,
-        readableDate: formatReadableDate(dateKey),
-      });
-    }
+  saveContent(newContent: string): Promise<void> {
+    this.content = newContent;
     return this.persist();
   }
 
-  deleteEntry(dateKey: string): Promise<void> {
-    this.timeline = this.timeline.filter((e: MemoryEntry) => e.id !== dateKey);
+  appendContent(textToAppend: string): Promise<void> {
+    const trimmed = textToAppend.trim();
+    if (!trimmed) return Promise.resolve();
+
+    this.content = this.content
+      ? `${this.content}\n\n${trimmed}`
+      : trimmed;
+
     return this.persist();
-  }
-
-  async mergeAppends(appends: Record<string, string>): Promise<number> {
-    const dateKeys = Object.keys(appends).filter((k) => appends[k]?.trim());
-    if (dateKeys.length === 0) return 0;
-
-    dateKeys.forEach((dateKey: string) => {
-      const appendBlock = `<append>${appends[dateKey].trim()}</append>`;
-      const existing = this.timeline.find((e: MemoryEntry) => e.id === dateKey);
-      if (existing) {
-        existing.text = existing.text
-          ? `${existing.text}\n\n${appendBlock}`
-          : appendBlock;
-      } else {
-        this.timeline.push({
-          id: dateKey,
-          text: appendBlock,
-          readableDate: formatReadableDate(dateKey),
-        });
-      }
-    });
-
-    await this.persist();
-    return dateKeys.length;
   }
 
   async changePassword(oldPassword: string, newPassword: string): Promise<boolean> {
@@ -164,7 +112,7 @@ export class VaultService {
         if (this.sessionKey === null) return;
         const payload: VaultData = {
           version: VAULT_FORMAT_VERSION,
-          timeline: this.timeline,
+          content: this.content,
         };
         const ciphertext = this.encryption.encrypt(
           JSON.stringify(payload),
