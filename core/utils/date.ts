@@ -1,42 +1,21 @@
+const TRAILING_EMPTY_TS = /\n?\[TIME \d{2}\/\d{2}\/\d{4} \d{2}:\d{2}\]:\s*$/;
+
 /**
- * Pure date helpers shared by the vault and the UI. Framework-agnostic —
- * uses only the built-in Date object, no browser-only APIs.
- *
- * Not part of your originally requested folder list, but VaultService needs
- * formatReadableDate() to build entries, so it lives here in core rather
- * than being duplicated in the webapp. See the summary for this note.
+ * Appends a fresh quick timestamp. If the text already ends with a timestamp
+ * nobody typed after (e.g. a page reload), that one is replaced instead of stacked.
  */
-
-/** Today's date as a YYYY-MM-DD key, in the user's local timezone. */
-export function getTodayKey(): string {
-  const d = new Date();
-  const offset = d.getTimezoneOffset();
-  const localDate = new Date(d.getTime() - offset * 60 * 1000);
-  return localDate.toISOString().split("T")[0];
+export function withFreshTimestamp(text: string): string {
+  const base = text.replace(TRAILING_EMPTY_TS, "");
+  const ts = getQuickTimestamp();
+  return base.trim() ? base + ts : ts.trimStart();
 }
-
-/** Converts a YYYY-MM-DD key into a human-readable date string. */
-export function formatReadableDate(dateKey: string): string {
-  const [year, month, day] = dateKey.split("-").map(Number);
-  const dateObj = new Date(year, month - 1, day);
-  return dateObj.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-/** A "[M/D/YYYY, h:mm AM/PM]: " stamp for auto-timestamping entries. */
-export function getTimestampString(): string {
+/** User-friendly timestamp in \n[TIME day/month/year hour:minute]: format. */
+export function getQuickTimestamp(): string {
   const now = new Date();
-  const formatted = now.toLocaleString("en-US", {
-    month: "numeric",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-  return `[${formatted}]: `;
+  const day = String(now.getDate()).padStart(2, "0");
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const year = now.getFullYear();
+  const hours = String(now.getHours()).padStart(2, "0");
+  const minutes = String(now.getMinutes()).padStart(2, "0");
+  return `\n[TIME ${day}/${month}/${year} ${hours}:${minutes}]: `;
 }

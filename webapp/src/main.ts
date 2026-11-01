@@ -1,9 +1,26 @@
 import { VaultService } from "@core/services/VaultService";
 import { BufferService } from "@core/services/BufferService";
-import { getTimestampString } from "@core/utils/date";
+import { withFreshTimestamp } from "@core/utils/date";
 
 import { IndexedDBAdapter } from "../adapters/IndexedDBAdapter";
 import { CryptoJSAdapter } from "../adapters/CryptoJSAdapter";
+
+const QUICK_OPEN = "\n[QUICK]\n";
+const QUICK_CLOSE = "\n[/QUICK]\n";
+
+/** Strips any QUICK tags so exactly one wrapper is ever applied. */
+function unwrapQuick(stored: string): string {
+  return stored.replace(/\n?\[\/?QUICK\]\n?/g, "").replace(/^\n+|\n+$/g, "");
+}
+
+function wrapQuick(inner: string): string {
+  return `${QUICK_OPEN}${unwrapQuick(inner)}${QUICK_CLOSE}`;
+}
+
+/** True if there's anything besides empty timestamps. */
+function hasRealBufferContent(stored: string): boolean {
+  return unwrapQuick(stored).replace(/\[TIME [^\]]*\]:/g, "").trim().length > 0;
+}
 
 /** Replaces the lock screen with an explanation when IndexedDB can't be used. */
 function showFatalStorageError(err: unknown): void {
@@ -111,9 +128,12 @@ async function bootstrap(): Promise<void> {
   }
 
   async function mergeBufferIntoVault(): Promise<boolean> {
-    const pendingText = await bufferService.getBuffer();
-    if (!pendingText.trim()) return false;
-    await vaultService.appendContent(pendingText);
+    const pending = await bufferService.getBuffer();
+    if (!hasRealBufferContent(pending)) {
+      if (pending) await bufferService.clear();
+      return false;
+    }
+    await vaultService.appendContent(wrapQuick(pending));
     await bufferService.clear();
     return true;
   }
@@ -168,19 +188,33 @@ async function bootstrap(): Promise<void> {
       unlocking = false;
     }
 
+    if (!success) {
+      passwordInput.value = "";
+      alert("Incorrect password.");
+      return;
+    }
+
     authModal.classList.add("visual-hidden");
     mainApp.classList.remove("visual-hidden");
 
-    if (success) {
-      memoryInput.value = vaultService.getContent();
+    // Timestamp goes in AFTER the buffer merge, so it lands below the merged entries.
+    const content = withFreshTimestamp(vaultService.getContent());
+    memoryInput.value = content;
+    try {
+      await vaultService.saveContent(content);
+    } catch (err) {
+      console.error(err);
+      memorySaveStatus.textContent = "⚠ Save failed";
     }
+    memoryInput.focus();
+    memoryInput.setSelectionRange(content.length, content.length);
+    memoryInput.scrollTop = memoryInput.scrollHeight;
 
     if (merged) {
       setTimeout(() => {
         alert(
           `✅ Your pending buffer entries have been merged and securely encrypted into your vault. The local buffer is now cleared.`
         );
-        memoryInput.value = vaultService.getContent();
       }, 150);
     }
   });
@@ -334,10 +368,18 @@ async function bootstrap(): Promise<void> {
     bufferPanel.classList.toggle("visual-hidden", bufferCurrentlyShown);
     authFormPanel.classList.toggle("visual-hidden", !bufferCurrentlyShown);
     lockViewToggleBtn.textContent = bufferCurrentlyShown ? "📝 Switch to Buffer" : "🔑 Switch to Unlock";
+    if (!bufferCurrentlyShown) {
+      bufferInput.focus();
+      bufferInput.setSelectionRange(bufferInput.value.length, bufferInput.value.length);
+    }
   });
 
   // --- BUFFER UI LOGIC ---
-  bufferInput.value = await bufferService.getBuffer();
+  // The textarea shows only the inner text; [QUICK] tags are applied on save.
+  const storedBuffer = await bufferService.getBuffer();
+  const initialInner = withFreshTimestamp(unwrapQuick(storedBuffer));
+  bufferInput.value = initialInner;
+  await bufferService.saveBuffer(wrapQuick(initialInner));
 
   let bufferAutosaveTimeout: ReturnType<typeof setTimeout> | null = null;
   bufferInput.addEventListener("input", () => {
@@ -346,9 +388,8 @@ async function bootstrap(): Promise<void> {
   });
 
   async function saveCurrentBuffer(): Promise<void> {
-    const text = bufferInput.value;
     try {
-      await bufferService.saveBuffer(text);
+      await bufferService.saveBuffer(wrapQuick(bufferInput.value));
     } catch (err) {
       console.error(err);
       bufferSaveStatus.textContent = "⚠ Save failed";
