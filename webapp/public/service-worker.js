@@ -1,6 +1,8 @@
 // DayMemory - Service Worker
 // Caches the app shell so it works fully offline once installed.
 
+const WORKER_ID = "a"
+
 const CACHE_NAME = 'daymemory-cache-v3';
 
 const APP_SHELL = [

@@ -24,62 +24,94 @@ const editingSectionId = ref<string | null>(null);
 const editTimestamp = ref("");
 const editText = ref("");
 
+function splitIntoSections(text: string): string[] {
+  if (!text) return [""];
+
+  const lines = text.match(/[^\n]*\n|[^\n]+$/g) || [];
+  const chunks: string[] = [];
+  let currentText = "";
+  let currentLineCount = 0;
+  let currentWordCount = 0;
+
+  const flush = () => {
+    if (currentLineCount === 0) return;
+    chunks.push(currentText);
+    currentText = "";
+    currentLineCount = 0;
+    currentWordCount = 0;
+  };
+
+  for (const line of lines) {
+    const hasLineEnding = line.endsWith("\n");
+    const content = hasLineEnding ? line.slice(0, -1) : line;
+    const tokens = content.match(/\S+|\s+/g) || [];
+    const lineChunks: string[] = [];
+    let lineChunk = "";
+    let lineChunkWords = 0;
+
+    for (const token of tokens) {
+      if (/^\s+$/.test(token)) {
+        lineChunk += token;
+        continue;
+      }
+
+      if (lineChunkWords === 200) {
+        lineChunks.push(lineChunk);
+        lineChunk = "";
+        lineChunkWords = 0;
+      }
+      lineChunk += token;
+      lineChunkWords++;
+    }
+
+    if (hasLineEnding) lineChunk += "\n";
+    lineChunks.push(lineChunk);
+
+    for (const lineChunk of lineChunks) {
+      const lineWords = (lineChunk.match(/\S+/g) || []).length;
+      if (
+        currentLineCount > 0 &&
+        (currentLineCount >= 20 || currentWordCount + lineWords > 200)
+      ) {
+        flush();
+      }
+
+      currentText += lineChunk;
+      currentLineCount++;
+      currentWordCount += lineWords;
+    }
+  }
+
+  flush();
+  return chunks;
+}
+
 const sections = computed<HistorySection[]>(() => {
   const text = props.content;
   if (!text) return [];
 
   const timeTagRegex = /(\[TIME\s+[^\]]+\]:)/g;
   const parts = text.split(timeTagRegex);
-
-  const result: HistorySection[] = [];
-  let startIndex = 0;
+  const sourceSections: { timestamp: string; text: string }[] = [];
 
   if (parts[0] && parts[0].trim().length > 0) {
-    result.push({
-      id: "sec-0",
-      fullText: parts[0]
-    });
+    sourceSections.push({ timestamp: "", text: parts[0] });
   }
-  startIndex = 1;
 
-  let secId = result.length;
-  for (let i = startIndex; i < parts.length; i += 2) {
+  for (let i = 1; i < parts.length; i += 2) {
     const tag = parts[i];
-    const body = parts[i + 1] || "";
-    if (tag) {
-      result.push({
-        id: `sec-${secId++}`,
-        fullText: tag + body
-      });
-    }
+    if (tag) sourceSections.push({ timestamp: tag, text: parts[i + 1] || "" });
   }
 
-  // Fallback if no time tags are found: split after 10 lines or 200 words
-  if (result.length === 0 && text.trim().length > 0) {
-    const lines = text.split("\n");
-    let currentLines: string[] = [];
-    let currentWordCount = 0;
-
-    for (const line of lines) {
-      const lineWords = line.trim() ? line.trim().split(/\s+/).length : 0;
-      if (currentLines.length >= 10 || (currentWordCount + lineWords > 200 && currentLines.length > 0)) {
-        result.push({
-          id: `sec-chunk-${result.length}`,
-          fullText: currentLines.join("\n")
-        });
-        currentLines = [line];
-        currentWordCount = lineWords;
-      } else {
-        currentLines.push(line);
-        currentWordCount += lineWords;
-      }
-    }
-    if (currentLines.length > 0) {
+  const result: HistorySection[] = [];
+  for (const section of sourceSections) {
+    const chunks = splitIntoSections(section.text);
+    chunks.forEach((chunk, index) => {
       result.push({
-        id: `sec-chunk-${result.length}`,
-        fullText: currentLines.join("\n")
+        id: `sec-${result.length}`,
+        fullText: (index === 0 ? section.timestamp : "") + chunk
       });
-    }
+    });
   }
 
   return result;
@@ -121,10 +153,7 @@ function saveSection(section: HistorySection): void {
     return sec;
   });
 
-  const hasTimeTags = props.content.includes("[TIME ");
-  const newContent = hasTimeTags
-    ? updatedSections.map(s => s.fullText).join("")
-    : updatedSections.map(s => s.fullText).join("\n");
+  const newContent = updatedSections.map(s => s.fullText).join("");
 
   emit("update:content", newContent);
   editingSectionId.value = null;
