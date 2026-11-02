@@ -15,7 +15,13 @@ interface HistorySection {
   fullText: string;
 }
 
+interface DisplaySection extends HistorySection {
+  timestamp: string;
+  text: string;
+}
+
 const editingSectionId = ref<string | null>(null);
+const editTimestamp = ref("");
 const editText = ref("");
 
 const sections = computed<HistorySection[]>(() => {
@@ -79,24 +85,38 @@ const sections = computed<HistorySection[]>(() => {
   return result;
 });
 
+const displaySections = computed<DisplaySection[]>(() =>
+  sections.value.map(section => {
+    const timestamp = section.fullText.match(/^(\[TIME\s+[^\]]+\]:)/)?.[0] || "";
+    return {
+      ...section,
+      timestamp,
+      text: section.fullText.slice(timestamp.length)
+    };
+  })
+);
+
 const editingSection = computed(() =>
   sections.value.find(section => section.id === editingSectionId.value)
 );
 
 function startEditing(section: HistorySection): void {
   editingSectionId.value = section.id;
-  editText.value = section.fullText;
+  const timestamp = section.fullText.match(/^(\[TIME\s+[^\]]+\]:)/);
+  editTimestamp.value = timestamp?.[0] || "";
+  editText.value = section.fullText.slice(editTimestamp.value.length);
 }
 
 function cancelEditing(): void {
   editingSectionId.value = null;
+  editTimestamp.value = "";
   editText.value = "";
 }
 
 function saveSection(section: HistorySection): void {
   const updatedSections = sections.value.map(sec => {
     if (sec.id === section.id) {
-      return { ...sec, fullText: editText.value };
+      return { ...sec, fullText: editTimestamp.value + editText.value };
     }
     return sec;
   });
@@ -108,6 +128,7 @@ function saveSection(section: HistorySection): void {
 
   emit("update:content", newContent);
   editingSectionId.value = null;
+  editTimestamp.value = "";
   editText.value = "";
 }
 </script>
@@ -125,12 +146,15 @@ function saveSection(section: HistorySection): void {
 
       <div v-else class="history-sections-container">
         <div
-          v-for="section in sections"
+          v-for="section in displaySections"
           :key="section.id"
           class="history-section-block"
         >
           <div class="memory-display section-text" tabindex="0">
-            {{ section.fullText }}
+            <span v-if="section.timestamp" class="section-timestamp">
+              {{ section.timestamp }}
+            </span>
+            <span>{{ section.text }}</span>
           </div>
           <div class="section-actions">
             <button
@@ -152,9 +176,17 @@ function saveSection(section: HistorySection): void {
           <h2>Edit timeline section</h2>
         </div>
         <textarea
+          v-if="editTimestamp"
+          :value="editTimestamp"
+          class="section-timestamp-textarea"
+          aria-label="Uneditable timestamp"
+          readonly
+          rows="1"
+        />
+        <textarea
           v-model="editText"
           class="backup-textarea section-editor-textarea"
-          aria-label="Timeline section text"
+          aria-label="Timeline section content"
         />
         <div class="section-editor-actions">
           <button

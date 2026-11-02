@@ -1,5 +1,12 @@
 <script setup lang="ts">
-defineProps<{
+import { computed } from "vue";
+
+interface BufferSection {
+  timestamp: string;
+  text: string;
+}
+
+const props = defineProps<{
   firstTime: boolean;
   mode: "buffer" | "unlock";
   password: string;
@@ -14,6 +21,28 @@ const emit = defineEmits<{
   "update:bufferText": [value: string];
   toggleMode: [];
 }>();
+
+const bufferSections = computed<BufferSection[]>(() => {
+  const parts = props.bufferText.split(/(\[TIME\s+[^\]]+\]:)/g);
+  if (parts.length === 1) return [{ timestamp: "", text: parts[0] }];
+
+  const sections: BufferSection[] = [];
+  if (parts[0]) sections.push({ timestamp: "", text: parts[0] });
+  for (let i = 1; i < parts.length; i += 2) {
+    sections.push({ timestamp: parts[i], text: parts[i + 1] || "" });
+  }
+  return sections;
+});
+
+function updateBufferSection(index: number, text: string): void {
+  const updatedSections = bufferSections.value.map((section, sectionIndex) =>
+    sectionIndex === index ? { ...section, text } : section
+  );
+  emit(
+    "update:bufferText",
+    updatedSections.map(section => section.timestamp + section.text).join("")
+  );
+}
 </script>
 
 <template>
@@ -49,13 +78,30 @@ const emit = defineEmits<{
         </p>
         <div class="editor-card buffer-editor">
           <label for="buffer-input" class="field-label">Quick Thoughts (Buffer):</label>
-          <textarea
-            id="buffer-input"
-            :value="bufferText"
-            placeholder="Jot something down..."
-            class="buffer-textarea"
-            @input="emit('update:bufferText', ($event.target as HTMLTextAreaElement).value)"
-          />
+          <div class="buffer-entries">
+            <div
+              v-for="(section, index) in bufferSections"
+              :key="index"
+              class="buffer-entry"
+            >
+              <textarea
+                v-if="section.timestamp"
+                :value="section.timestamp"
+                class="buffer-timestamp-textarea"
+                aria-label="Uneditable timestamp"
+                readonly
+                rows="1"
+              />
+              <textarea
+                :id="index === 0 ? 'buffer-input' : undefined"
+                :value="section.text"
+                :placeholder="index === 0 ? 'Jot something down...' : undefined"
+                class="buffer-textarea"
+                :aria-label="`Quick thoughts ${index + 1}`"
+                @input="updateBufferSection(index, ($event.target as HTMLTextAreaElement).value)"
+              />
+            </div>
+          </div>
           <span class="status-msg" aria-live="polite">{{ bufferSaveStatus }}</span>
         </div>
       </section>
