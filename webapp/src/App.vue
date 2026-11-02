@@ -27,7 +27,7 @@ const activeView = ref<"thoughts" | "settings">("thoughts");
 
 const backupVisible = ref(false);
 const changePasswordVisible = ref(false);
-const backupMode = ref<"export" | "import">("export");
+const backupMode = ref<"encrypted-export" | "unencrypted-export" | "import">("encrypted-export");
 const backupText = ref("");
 const backupStatus = ref("");
 const oldPassword = ref("");
@@ -166,18 +166,22 @@ function navigate(view: "thoughts" | "settings"): void {
   }
 }
 
-async function exportVault(): Promise<void> {
-  backupMode.value = "export";
+async function openExport(type: "encrypted" | "unencrypted"): Promise<void> {
+  backupMode.value = type === "encrypted" ? "encrypted-export" : "unencrypted-export";
   changePasswordVisible.value = false;
   backupVisible.value = true;
   backupText.value = "";
   backupStatus.value = "";
   try {
     if (!vaultService) throw new Error("Vault service is not initialized.");
-    backupText.value = (await vaultService.exportRaw()) || "";
+    if (type === "encrypted") {
+      backupText.value = (await vaultService.exportRaw()) || "";
+    } else {
+      backupText.value = vaultService.getContent() || "";
+    }
   } catch (error) {
     console.error(error);
-    backupStatus.value = "⚠ Couldn't read the vault from storage.";
+    backupStatus.value = "⚠ Couldn't read vault content from storage.";
   }
 }
 
@@ -189,19 +193,46 @@ function importVault(): void {
   backupStatus.value = "";
 }
 
-async function submitBackup(): Promise<void> {
-  if (backupMode.value === "export") {
+function downloadFile(filename: string, text: string): void {
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+async function submitBackup(actionType: "clipboard" | "file"): Promise<void> {
+  if (backupMode.value === "encrypted-export" || backupMode.value === "unencrypted-export") {
     if (!backupText.value) return;
-    try {
-      await navigator.clipboard.writeText(backupText.value);
-      backupStatus.value = "Encrypted vault string copied to clipboard!";
-    } catch (error) {
-      console.error(error);
-      backupStatus.value = "⚠ Couldn't copy the vault string to the clipboard.";
+    const isEncrypted = backupMode.value === "encrypted-export";
+    const label = isEncrypted ? "Encrypted vault string" : "Unencrypted vault content";
+    const filename = isEncrypted ? "daymemory-vault-encrypted.txt" : "daymemory-vault-unencrypted.txt";
+
+    if (actionType === "clipboard") {
+      try {
+        await navigator.clipboard.writeText(backupText.value);
+        backupStatus.value = `${label} copied to clipboard!`;
+      } catch (error) {
+        console.error(error);
+        backupStatus.value = `⚠ Couldn't copy ${label.toLowerCase()} to clipboard.`;
+      }
+    } else {
+      try {
+        downloadFile(filename, backupText.value);
+        backupStatus.value = `${label} exported as file!`;
+      } catch (error) {
+        console.error(error);
+        backupStatus.value = `⚠ Couldn't trigger file download.`;
+      }
     }
     return;
   }
 
+  // Import mode
   const raw = backupText.value.trim();
   if (!raw || !window.confirm("This will overwrite all current system entries with your backup text. Proceed?")) {
     return;
@@ -323,7 +354,7 @@ onBeforeUnmount(() => {
       :password-status="passwordStatus"
       @lock="lockVault"
       @navigate="navigate"
-      @export-vault="exportVault"
+      @open-export="openExport"
       @import-vault="importVault"
       @toggle-password-panel="togglePasswordPanel"
       @submit-backup="submitBackup"

@@ -1,8 +1,9 @@
+<!-- SettingsView.vue -->
 <script setup lang="ts">
 defineProps<{
   backupVisible: boolean;
   changePasswordVisible: boolean;
-  backupMode: "export" | "import";
+  backupMode: "encrypted-export" | "unencrypted-export" | "import";
   backupText: string;
   backupStatus: string;
   oldPassword: string;
@@ -12,10 +13,10 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{
-  exportVault: [];
+  openExport: [type: "encrypted" | "unencrypted"];
   importVault: [];
   togglePasswordPanel: [];
-  submitBackup: [];
+  submitBackup: [actionType: "clipboard" | "file"];
   submitPassword: [];
   "update:backupText": [value: string];
   "update:oldPassword": [value: string];
@@ -29,11 +30,15 @@ const emit = defineEmits<{
     <div class="section-title">Data Administration</div>
     <div class="panel-box">
       <p class="section-desc">
-        Manage encrypted vault string backups and security settings directly.
+        Manage encrypted or unencrypted vault exports, file downloads, backups, and security settings directly.
       </p>
       <div class="backup-actions">
-        <button class="secondary-btn" @click="emit('exportVault')">
-          Export Vault String
+        <button class="secondary-btn" @click="emit('openExport', 'encrypted')">
+          Export Vault (Encrypted)
+        </button>
+        <button class="secondary-btn warning-action-btn" @click="emit('openExport', 'unencrypted')">
+          <span>Export Vault (Unencrypted)</span>
+          <span class="badge-not-recommended">⚠️ Not Recommended</span>
         </button>
         <button class="secondary-btn" @click="emit('importVault')">
           Import Vault String
@@ -44,24 +49,54 @@ const emit = defineEmits<{
       </div>
 
       <div v-if="backupVisible" class="settings-subpanel">
+        <div class="export-mode-banner" v-if="backupMode !== 'import'">
+          <strong>
+            {{ backupMode === 'encrypted-export' ? '🔒 Encrypted Export Mode' : '🔓 Unencrypted Export Mode (⚠️ Not Recommended)' }}
+          </strong>
+          <p class="subpanel-hint">
+            {{ 
+              backupMode === 'encrypted-export' 
+                ? 'Your vault remains fully protected by zero-knowledge encryption.' 
+                : 'Warning: Plain text exports expose your timeline history in readable text format.' 
+            }}
+          </p>
+        </div>
+
         <textarea
           :value="backupText"
-          :readonly="backupMode === 'export'"
+          :readonly="backupMode !== 'import'"
           :placeholder="
-            backupMode === 'export'
-              ? 'Encrypted vault string'
-              : 'Paste raw encrypted string structure blocks here for state restoration...'
+            backupMode === 'import'
+              ? 'Paste raw encrypted string structure blocks here for state restoration...'
+              : 'Vault export string content...'
           "
           class="backup-textarea"
           @input="emit('update:backupText', ($event.target as HTMLTextAreaElement).value)"
         />
+
+        <div v-if="backupMode !== 'import'" class="export-options-group">
+          <button
+            class="backup-submit"
+            @click="emit('submitBackup', 'clipboard')"
+          >
+            📋 Copy String to Clipboard
+          </button>
+          <button
+            class="backup-submit secondary-submit"
+            @click="emit('submitBackup', 'file')"
+          >
+            💾 Download as File (.txt)
+          </button>
+        </div>
+
         <button
-          :class="{ 'danger-btn': backupMode === 'import' }"
-          class="backup-submit"
-          @click="emit('submitBackup')"
+          v-else
+          class="backup-submit danger-btn"
+          @click="emit('submitBackup', 'clipboard')"
         >
-          {{ backupMode === "export" ? "📋 Copy to Clipboard" : "🔥 Restore Backup (Overwrite)" }}
+          🔥 Restore Backup (Overwrite)
         </button>
+
         <span class="status-msg" aria-live="polite">{{ backupStatus }}</span>
       </div>
 
@@ -104,3 +139,104 @@ const emit = defineEmits<{
     </div>
   </section>
 </template>
+
+<style scoped>
+.panel-box {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.backup-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.backup-actions button {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.warning-action-btn {
+  border-color: #e67700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.5rem;
+}
+
+.badge-not-recommended {
+  font-size: 0.72rem;
+  background: #fff3bf;
+  color: #e67700;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.settings-subpanel {
+  margin-top: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.export-mode-banner {
+  margin-bottom: 0.75rem;
+  padding: 0.6rem;
+  background: var(--banner-bg, #f8f9fa);
+  border-left: 3px solid #e67700;
+  border-radius: 4px;
+  word-break: break-word;
+}
+
+.subpanel-hint {
+  font-size: 0.85rem;
+  color: #666;
+  margin-top: 0.25rem;
+  margin-bottom: 0;
+}
+
+.backup-textarea {
+  width: 100%;
+  min-height: 120px;
+  box-sizing: border-box;
+}
+
+.export-options-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  width: 100%;
+}
+
+.export-options-group button,
+.backup-submit {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.secondary-submit {
+  background-color: #495057;
+}
+
+/* Tablet & Desktop breakpoint refinements */
+@media (min-width: 640px) {
+  .backup-actions {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .export-options-group {
+    flex-direction: row;
+  }
+
+  .export-options-group button {
+    flex: 1;
+  }
+}
+</style>
