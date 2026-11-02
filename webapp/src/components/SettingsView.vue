@@ -1,9 +1,11 @@
 <!-- SettingsView.vue -->
 <script setup lang="ts">
+import { ref } from "vue";
+
 defineProps<{
   backupVisible: boolean;
   changePasswordVisible: boolean;
-  backupMode: "encrypted-export" | "unencrypted-export" | "import";
+  backupMode: "encrypted-export" | "unencrypted-export" | "encrypted-import" | "unencrypted-import";
   backupText: string;
   backupStatus: string;
   oldPassword: string;
@@ -14,15 +16,22 @@ defineProps<{
 
 const emit = defineEmits<{
   openExport: [type: "encrypted" | "unencrypted"];
-  importVault: [];
+  openImport: [type: "encrypted" | "unencrypted"];
   togglePasswordPanel: [];
-  submitBackup: [actionType: "clipboard" | "file"];
+  submitBackup: [actionType: "clipboard" | "file" | "restore"];
+  fileImportUpload: [event: Event];
   submitPassword: [];
   "update:backupText": [value: string];
   "update:oldPassword": [value: string];
   "update:newPassword": [value: string];
   "update:passwordConfirmation": [value: string];
 }>();
+
+const fileInputRef = ref<HTMLInputElement | null>(null);
+
+function triggerFileInput(): void {
+  fileInputRef.value?.click();
+}
 </script>
 
 <template>
@@ -30,7 +39,7 @@ const emit = defineEmits<{
     <div class="section-title">Data Administration</div>
     <div class="panel-box">
       <p class="section-desc">
-        Manage encrypted or unencrypted vault exports, file downloads, backups, and security settings directly.
+        Manage encrypted and unencrypted exports, file uploads/downloads, text imports, and security credentials directly.
       </p>
       <div class="backup-actions">
         <button class="secondary-btn" @click="emit('openExport', 'encrypted')">
@@ -40,8 +49,11 @@ const emit = defineEmits<{
           <span>Export Vault (Unencrypted)</span>
           <span class="badge-not-recommended">⚠️ Not Recommended</span>
         </button>
-        <button class="secondary-btn" @click="emit('importVault')">
-          Import Vault String
+        <button class="secondary-btn" @click="emit('openImport', 'encrypted')">
+          Import Vault (Encrypted)
+        </button>
+        <button class="secondary-btn" @click="emit('openImport', 'unencrypted')">
+          Import Vault (Unencrypted)
         </button>
         <button class="secondary-btn change-password-button" @click="emit('togglePasswordPanel')">
           🔑 Change Password
@@ -49,32 +61,53 @@ const emit = defineEmits<{
       </div>
 
       <div v-if="backupVisible" class="settings-subpanel">
-        <div class="export-mode-banner" v-if="backupMode !== 'import'">
+        <div class="export-mode-banner" :class="{ 'warning-banner': backupMode === 'unencrypted-export' }">
           <strong>
-            {{ backupMode === 'encrypted-export' ? '🔒 Encrypted Export Mode' : '🔓 Unencrypted Export Mode (⚠️ Not Recommended)' }}
+            {{ 
+              backupMode === 'encrypted-export' ? '🔒 Encrypted Export Mode' :
+              backupMode === 'unencrypted-export' ? '🔓 Unencrypted Export Mode (⚠️ Not Recommended)' :
+              backupMode === 'encrypted-import' ? '📥 Encrypted Import Mode' :
+              '📥 Unencrypted Import Mode'
+            }}
           </strong>
           <p class="subpanel-hint">
             {{ 
-              backupMode === 'encrypted-export' 
-                ? 'Your vault remains fully protected by zero-knowledge encryption.' 
-                : 'Warning: Plain text exports expose your timeline history in readable text format.' 
+              backupMode === 'encrypted-export' ? 'Your vault remains fully protected by zero-knowledge encryption.' :
+              backupMode === 'unencrypted-export' ? 'Warning: Plain text exports expose your timeline history in readable text format.' :
+              backupMode === 'encrypted-import' ? 'Upload an encrypted backup file or paste string blocks to restore your vault state.' :
+              'Upload an unencrypted text file or paste text content to overwrite your vault and automatically re-encrypt it under your current master password.'
             }}
           </p>
         </div>
 
+        <!-- Hidden file input for file-based imports -->
+        <input
+          ref="fileInputRef"
+          type="file"
+          accept=".txt,text/plain"
+          style="display: none;"
+          @change="emit('fileImportUpload', $event)"
+        />
+
+        <div v-if="backupMode.includes('import')" class="import-file-selector-bar">
+          <button type="button" class="secondary-btn file-select-btn" @click="triggerFileInput">
+            📁 Choose File to Import...
+          </button>
+        </div>
+
         <textarea
           :value="backupText"
-          :readonly="backupMode !== 'import'"
+          :readonly="!backupMode.includes('import')"
           :placeholder="
-            backupMode === 'import'
-              ? 'Paste raw encrypted string structure blocks here for state restoration...'
-              : 'Vault export string content...'
+            backupMode.includes('import')
+              ? 'Paste content/structure blocks here or select a file above...'
+              : 'Vault export content string...'
           "
           class="backup-textarea"
           @input="emit('update:backupText', ($event.target as HTMLTextAreaElement).value)"
         />
 
-        <div v-if="backupMode !== 'import'" class="export-options-group">
+        <div v-if="backupMode.includes('export')" class="export-options-group">
           <button
             class="backup-submit"
             @click="emit('submitBackup', 'clipboard')"
@@ -92,7 +125,7 @@ const emit = defineEmits<{
         <button
           v-else
           class="backup-submit danger-btn"
-          @click="emit('submitBackup', 'clipboard')"
+          @click="emit('submitBackup', 'restore')"
         >
           🔥 Restore Backup (Overwrite)
         </button>
@@ -188,9 +221,13 @@ const emit = defineEmits<{
   margin-bottom: 0.75rem;
   padding: 0.6rem;
   background: var(--banner-bg, #f8f9fa);
-  border-left: 3px solid #e67700;
+  border-left: 3px solid #2b8a3e;
   border-radius: 4px;
   word-break: break-word;
+}
+
+.export-mode-banner.warning-banner {
+  border-left-color: #e67700;
 }
 
 .subpanel-hint {
@@ -198,6 +235,17 @@ const emit = defineEmits<{
   color: #666;
   margin-top: 0.25rem;
   margin-bottom: 0;
+}
+
+.import-file-selector-bar {
+  margin-bottom: 0.5rem;
+  width: 100%;
+}
+
+.file-select-btn {
+  width: 100%;
+  box-sizing: border-box;
+  background-color: var(--secondary-btn-bg, #e9ecef);
 }
 
 .backup-textarea {
@@ -224,7 +272,6 @@ const emit = defineEmits<{
   background-color: #495057;
 }
 
-/* Tablet & Desktop breakpoint refinements */
 @media (min-width: 640px) {
   .backup-actions {
     display: grid;

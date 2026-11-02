@@ -27,7 +27,7 @@ const activeView = ref<"thoughts" | "settings">("thoughts");
 
 const backupVisible = ref(false);
 const changePasswordVisible = ref(false);
-const backupMode = ref<"encrypted-export" | "unencrypted-export" | "import">("encrypted-export");
+const backupMode = ref<"encrypted-export" | "unencrypted-export" | "encrypted-import" | "unencrypted-import">("encrypted-export");
 const backupText = ref("");
 const backupStatus = ref("");
 const oldPassword = ref("");
@@ -185,8 +185,8 @@ async function openExport(type: "encrypted" | "unencrypted"): Promise<void> {
   }
 }
 
-function importVault(): void {
-  backupMode.value = "import";
+function openImport(type: "encrypted" | "unencrypted"): void {
+  backupMode.value = type === "encrypted" ? "encrypted-import" : "unencrypted-import";
   changePasswordVisible.value = false;
   backupVisible.value = true;
   backupText.value = "";
@@ -205,7 +205,27 @@ function downloadFile(filename: string, text: string): void {
   URL.revokeObjectURL(url);
 }
 
-async function submitBackup(actionType: "clipboard" | "file"): Promise<void> {
+function handleFileImportUpload(event: Event): void {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const result = e.target?.result;
+    if (typeof result === "string") {
+      backupText.value = result;
+      backupStatus.value = `Loaded file: ${file.name}`;
+    }
+  };
+  reader.onerror = () => {
+    backupStatus.value = "⚠ Failed to read the selected file.";
+  };
+  reader.readAsText(file);
+  target.value = ""; // Reset input so the same file can be selected again if needed
+}
+
+async function submitBackup(actionType: "clipboard" | "file" | "restore"): Promise<void> {
   if (backupMode.value === "encrypted-export" || backupMode.value === "unencrypted-export") {
     if (!backupText.value) return;
     const isEncrypted = backupMode.value === "encrypted-export";
@@ -232,20 +252,31 @@ async function submitBackup(actionType: "clipboard" | "file"): Promise<void> {
     return;
   }
 
-  // Import mode
   const raw = backupText.value.trim();
-  if (!raw || !window.confirm("This will overwrite all current system entries with your backup text. Proceed?")) {
+  if (!raw) return;
+
+  const isUnencryptedImport = backupMode.value === "unencrypted-import";
+  const confirmMsg = isUnencryptedImport
+    ? "This will overwrite your current vault content with the imported text, and securely re-encrypt it using your active master password. Proceed?"
+    : "This will overwrite all current system entries with your encrypted backup text. Proceed?";
+
+  if (!window.confirm(confirmMsg)) {
     return;
   }
+
   try {
     if (!vaultService) throw new Error("Vault service is not initialized.");
-    await vaultService.importRaw(raw);
+    if (isUnencryptedImport) {
+      await vaultService.saveContent(raw);
+    } else {
+      await vaultService.importRaw(raw);
+    }
   } catch (error) {
     console.error(error);
-    backupStatus.value = "⚠ Couldn't write the backup to storage. Nothing was changed.";
+    backupStatus.value = "⚠ Couldn't write the import data to storage. Nothing was changed.";
     return;
   }
-  window.alert("Vault string imported successfully! App environment will now refresh.");
+  window.alert("Vault import successful! App environment will now refresh.");
   window.location.reload();
 }
 
@@ -355,9 +386,10 @@ onBeforeUnmount(() => {
       @lock="lockVault"
       @navigate="navigate"
       @open-export="openExport"
-      @import-vault="importVault"
+      @open-import="openImport"
       @toggle-password-panel="togglePasswordPanel"
       @submit-backup="submitBackup"
+      @file-import-upload="handleFileImportUpload"
       @submit-password="submitPasswordChange"
       @update:backup-text="backupText = $event"
       @update:old-password="oldPassword = $event"

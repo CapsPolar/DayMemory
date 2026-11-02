@@ -8,7 +8,7 @@ defineProps<{
   content: string;
   backupVisible: boolean;
   changePasswordVisible: boolean;
-  backupMode: "encrypted-export" | "unencrypted-export" | "import";
+  backupMode: "encrypted-export" | "unencrypted-export" | "encrypted-import" | "unencrypted-import";
   backupText: string;
   backupStatus: string;
   oldPassword: string;
@@ -21,9 +21,10 @@ const emit = defineEmits<{
   lock: [];
   navigate: [view: "thoughts" | "settings"];
   openExport: [type: "encrypted" | "unencrypted"];
-  importVault: [];
+  openImport: [type: "encrypted" | "unencrypted"];
   togglePasswordPanel: [];
-  submitBackup: [actionType: "clipboard" | "file"];
+  submitBackup: [actionType: "clipboard" | "file" | "restore"];
+  fileImportUpload: [event: Event];
   submitPassword: [];
   "update:backupText": [value: string];
   "update:oldPassword": [value: string];
@@ -60,9 +61,10 @@ const emit = defineEmits<{
         :password-confirmation="passwordConfirmation"
         :password-status="passwordStatus"
         @open-export="emit('openExport', $event)"
-        @import-vault="emit('importVault')"
+        @open-import="emit('openImport', $event)"
         @toggle-password-panel="emit('togglePasswordPanel')"
         @submit-backup="emit('submitBackup', $event)"
+        @file-import-upload="emit('fileImportUpload', $event)"
         @submit-password="emit('submitPassword')"
         @update:backup-text="emit('update:backupText', $event)"
         @update:old-password="emit('update:oldPassword', $event)"
