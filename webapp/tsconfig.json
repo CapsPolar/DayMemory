@@ -17,5 +17,11 @@
     },
     "types": ["vite/client"]
   },
-  "include": ["src", "adapters", "../core"]
+  "include": [
+    "src",
+    "adapters/IndexedDBAdapter.ts",
+    "adapters/CryptoJSAdapter.ts",
+    "adapters/types/crypto-js.d.ts",
+    "../core"
+  ]
 }

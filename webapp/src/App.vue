@@ -1,0 +1,381 @@
+<script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref } from "vue";
+import { BufferService } from "@core/services/BufferService";
+import { VaultService } from "@core/services/VaultService";
+import { withFreshTimestamp } from "@core/utils/date";
+import { CryptoJSAdapter } from "../adapters/CryptoJSAdapter";
+import { IndexedDBAdapter } from "../adapters/IndexedDBAdapter";
+import AuthModal from "./components/AuthModal.vue";
+import MainApp from "./components/MainApp.vue";
+
+const QUICK_OPEN = "\n[QUICK]\n";
+const QUICK_CLOSE = "\n[/QUICK]\n";
+
+function unwrapQuick(stored: string): string {
+  return stored.replace(/\n?\[\/?QUICK\]\n?/g, "").replace(/^\n+|\n+$/g, "");
+}
+
+function wrapQuick(inner: string): string {
+  return `${QUICK_OPEN}${unwrapQuick(inner)}${QUICK_CLOSE}`;
+}
+
+function hasRealBufferContent(stored: string): boolean {
+  return unwrapQuick(stored).replace(/\[TIME [^\]]*\]:/g, "").trim().length > 0;
+}
+
+const isUnlocked = ref(false);
+const initialized = ref(false);
+const storageError = ref("");
+const firstTime = ref(false);
+const mode = ref<"buffer" | "unlock">("buffer");
+const password = ref("");
+const unlocking = ref(false);
+const bufferText = ref("");
+const bufferSaveStatus = ref("");
+const content = ref("");
+const saveStatus = ref("");
+const activeView = ref<"thoughts" | "settings">("thoughts");
+
+const backupVisible = ref(false);
+const changePasswordVisible = ref(false);
+const backupMode = ref<"export" | "import">("export");
+const backupText = ref("");
+const backupStatus = ref("");
+const oldPassword = ref("");
+const newPassword = ref("");
+const passwordConfirmation = ref("");
+const passwordStatus = ref("");
+
+let vaultService: VaultService | null = null;
+let bufferService: BufferService | null = null;
+let memoryAutosaveTimeout: ReturnType<typeof setTimeout> | null = null;
+let bufferAutosaveTimeout: ReturnType<typeof setTimeout> | null = null;
+let memoryStatusTimeout: ReturnType<typeof setTimeout> | null = null;
+let bufferStatusTimeout: ReturnType<typeof setTimeout> | null = null;
+let passwordReloadTimeout: ReturnType<typeof setTimeout> | null = null;
+
+function clearTimer(timer: ReturnType<typeof setTimeout> | null): null {
+  if (timer !== null) clearTimeout(timer);
+  return null;
+}
+
+function showSavedStatus(target: typeof saveStatus, isBuffer = false): void {
+  target.value = "✓ Saved";
+  if (isBuffer) {
+    bufferStatusTimeout = clearTimer(bufferStatusTimeout);
+    bufferStatusTimeout = setTimeout(() => (target.value = ""), 1500);
+  } else {
+    memoryStatusTimeout = clearTimer(memoryStatusTimeout);
+    memoryStatusTimeout = setTimeout(() => (target.value = ""), 1500);
+  }
+}
+
+function describeError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+async function initialize(): Promise<void> {
+  const storage = new IndexedDBAdapter();
+  try {
+    await storage.open();
+    vaultService = new VaultService(storage, new CryptoJSAdapter());
+    bufferService = new BufferService(storage);
+    firstTime.value = !(await vaultService.hasVault());
+
+    const storedBuffer = await bufferService.getBuffer();
+    const initialText = withFreshTimestamp(unwrapQuick(storedBuffer));
+    bufferText.value = initialText;
+    await bufferService.saveBuffer(wrapQuick(initialText));
+  } catch (error) {
+    console.error(error);
+    storageError.value = `DayMemory couldn't access its local IndexedDB storage (${describeError(error)}). Check that site data is available and try again. Private/incognito mode or blocked site data can cause this.`;
+  } finally {
+    initialized.value = true;
+  }
+}
+
+async function mergeBufferIntoVault(): Promise<boolean> {
+  if (!bufferService || !vaultService) throw new Error("Vault services are not initialized.");
+
+  const pending = await bufferService.getBuffer();
+  if (!hasRealBufferContent(pending)) {
+    if (pending) await bufferService.clear();
+    return false;
+  }
+
+  await vaultService.appendContent(wrapQuick(pending));
+  await bufferService.clear();
+  return true;
+}
+
+async function unlock(): Promise<void> {
+  const enteredPassword = password.value.trim();
+  if (!enteredPassword || unlocking.value || !vaultService) return;
+
+  unlocking.value = true;
+  let success = false;
+  let merged = false;
+  try {
+    success = await vaultService.unlock(enteredPassword);
+    if (success) merged = await mergeBufferIntoVault();
+  } catch (error) {
+    console.error(error);
+    vaultService.lock();
+    window.alert(
+      `Couldn't read or write the vault in IndexedDB (${describeError(error)}). Nothing was changed; try again.`
+    );
+    return;
+  } finally {
+    unlocking.value = false;
+  }
+
+  if (!success) {
+    password.value = "";
+    window.alert("Incorrect password.");
+    return;
+  }
+
+  isUnlocked.value = true;
+  const currentContent = withFreshTimestamp(vaultService.getContent());
+  content.value = currentContent;
+  try {
+    await vaultService.saveContent(currentContent);
+  } catch (error) {
+    console.error(error);
+    saveStatus.value = "⚠ Save failed";
+  }
+
+  if (merged) {
+    window.setTimeout(() => {
+      window.alert(
+        "✅ Your pending buffer entries have been merged and securely encrypted into your vault. The local buffer is now cleared."
+      );
+    }, 150);
+  }
+}
+
+function updateContent(value: string): void {
+  content.value = value;
+  memoryAutosaveTimeout = clearTimer(memoryAutosaveTimeout);
+  memoryAutosaveTimeout = setTimeout(() => void saveCurrentContent(), 500);
+}
+
+async function saveCurrentContent(): Promise<void> {
+  if (!vaultService) return;
+  try {
+    await vaultService.saveContent(content.value);
+  } catch (error) {
+    console.error(error);
+    saveStatus.value = "⚠ Save failed";
+    return;
+  }
+  showSavedStatus(saveStatus);
+}
+
+function updateBuffer(value: string): void {
+  bufferText.value = value;
+  bufferAutosaveTimeout = clearTimer(bufferAutosaveTimeout);
+  bufferAutosaveTimeout = setTimeout(() => void saveCurrentBuffer(), 500);
+}
+
+async function saveCurrentBuffer(): Promise<void> {
+  if (!bufferService) return;
+  try {
+    await bufferService.saveBuffer(wrapQuick(bufferText.value));
+  } catch (error) {
+    console.error(error);
+    bufferSaveStatus.value = "⚠ Save failed";
+    return;
+  }
+  showSavedStatus(bufferSaveStatus, true);
+}
+
+function navigate(view: "thoughts" | "settings"): void {
+  activeView.value = view;
+  if (view === "settings") {
+    backupVisible.value = false;
+    changePasswordVisible.value = false;
+  }
+}
+
+async function exportVault(): Promise<void> {
+  backupMode.value = "export";
+  changePasswordVisible.value = false;
+  backupVisible.value = true;
+  backupText.value = "";
+  backupStatus.value = "";
+  try {
+    if (!vaultService) throw new Error("Vault service is not initialized.");
+    backupText.value = (await vaultService.exportRaw()) || "";
+  } catch (error) {
+    console.error(error);
+    backupStatus.value = "⚠ Couldn't read the vault from storage.";
+  }
+}
+
+function importVault(): void {
+  backupMode.value = "import";
+  changePasswordVisible.value = false;
+  backupVisible.value = true;
+  backupText.value = "";
+  backupStatus.value = "";
+}
+
+async function submitBackup(): Promise<void> {
+  if (backupMode.value === "export") {
+    if (!backupText.value) return;
+    try {
+      await navigator.clipboard.writeText(backupText.value);
+      backupStatus.value = "Encrypted vault string copied to clipboard!";
+    } catch (error) {
+      console.error(error);
+      backupStatus.value = "⚠ Couldn't copy the vault string to the clipboard.";
+    }
+    return;
+  }
+
+  const raw = backupText.value.trim();
+  if (!raw || !window.confirm("This will overwrite all current system entries with your backup text. Proceed?")) {
+    return;
+  }
+  try {
+    if (!vaultService) throw new Error("Vault service is not initialized.");
+    await vaultService.importRaw(raw);
+  } catch (error) {
+    console.error(error);
+    backupStatus.value = "⚠ Couldn't write the backup to storage. Nothing was changed.";
+    return;
+  }
+  window.alert("Vault string imported successfully! App environment will now refresh.");
+  window.location.reload();
+}
+
+function togglePasswordPanel(): void {
+  backupVisible.value = false;
+  changePasswordVisible.value = !changePasswordVisible.value;
+  oldPassword.value = "";
+  newPassword.value = "";
+  passwordConfirmation.value = "";
+  passwordStatus.value = "";
+}
+
+async function submitPasswordChange(): Promise<void> {
+  const old = oldPassword.value.trim();
+  const next = newPassword.value.trim();
+  const confirmation = passwordConfirmation.value.trim();
+
+  if (!old || !next || !confirmation) {
+    passwordStatus.value = "❌ Please fulfill all verification parameters.";
+    return;
+  }
+  if (next !== confirmation) {
+    passwordStatus.value = "❌ Mismatch across new target password entries.";
+    return;
+  }
+  if (old === next) {
+    passwordStatus.value = "❌ New password must be distinct from old baseline configuration.";
+    return;
+  }
+
+  let changed = false;
+  try {
+    if (!vaultService) throw new Error("Vault service is not initialized.");
+    changed = await vaultService.changePassword(old, next);
+  } catch (error) {
+    console.error(error);
+    passwordStatus.value = "❌ Couldn't write the re-encrypted vault to storage. Password unchanged.";
+    return;
+  }
+  if (!changed) {
+    passwordStatus.value = "❌ Confirmed old master password validation fails.";
+    return;
+  }
+
+  passwordStatus.value = "🎉 Encryption key swapped! Reloading engine state...";
+  passwordReloadTimeout = setTimeout(() => window.location.reload(), 1500);
+}
+
+async function lockVault(): Promise<void> {
+  const hasPendingSave = memoryAutosaveTimeout !== null;
+  memoryAutosaveTimeout = clearTimer(memoryAutosaveTimeout);
+  try {
+    if (hasPendingSave && vaultService) await vaultService.saveContent(content.value);
+  } catch (error) {
+    console.error(error);
+    window.alert(`Couldn't save the latest changes before locking (${describeError(error)}).`);
+  } finally {
+    vaultService?.lock();
+    content.value = "";
+    isUnlocked.value = false;
+    mode.value = "buffer";
+    password.value = "";
+  }
+}
+
+onMounted(() => void initialize());
+
+onBeforeUnmount(() => {
+  memoryAutosaveTimeout = clearTimer(memoryAutosaveTimeout);
+  bufferAutosaveTimeout = clearTimer(bufferAutosaveTimeout);
+  memoryStatusTimeout = clearTimer(memoryStatusTimeout);
+  bufferStatusTimeout = clearTimer(bufferStatusTimeout);
+  passwordReloadTimeout = clearTimer(passwordReloadTimeout);
+  vaultService?.lock();
+});
+</script>
+
+<template>
+  <div v-if="storageError" class="modal-overlay">
+    <div class="modal-content storage-error">
+      <h2>Storage unavailable</h2>
+      <p class="status-msg">{{ storageError }}</p>
+    </div>
+  </div>
+  <div v-else-if="!initialized" class="modal-overlay">
+    <div class="modal-content storage-error">
+      <h2>Opening DayMemory…</h2>
+    </div>
+  </div>
+  <template v-else>
+    <AuthModal
+      v-if="!isUnlocked"
+      :first-time="firstTime"
+      :mode="mode"
+      :password="password"
+      :buffer-text="bufferText"
+      :buffer-save-status="bufferSaveStatus"
+      :unlocking="unlocking"
+      @unlock="unlock"
+      @update:password="password = $event"
+      @update:buffer-text="updateBuffer"
+      @toggle-mode="mode = mode === 'buffer' ? 'unlock' : 'buffer'"
+    />
+    <MainApp
+      v-else
+      :active-view="activeView"
+      :content="content"
+      :save-status="saveStatus"
+      :backup-visible="backupVisible"
+      :change-password-visible="changePasswordVisible"
+      :backup-mode="backupMode"
+      :backup-text="backupText"
+      :backup-status="backupStatus"
+      :old-password="oldPassword"
+      :new-password="newPassword"
+      :password-confirmation="passwordConfirmation"
+      :password-status="passwordStatus"
+      @lock="lockVault"
+      @navigate="navigate"
+      @update:content="updateContent"
+      @export-vault="exportVault"
+      @import-vault="importVault"
+      @toggle-password-panel="togglePasswordPanel"
+      @submit-backup="submitBackup"
+      @submit-password="submitPasswordChange"
+      @update:backup-text="backupText = $event"
+      @update:old-password="oldPassword = $event"
+      @update:new-password="newPassword = $event"
+      @update:password-confirmation="passwordConfirmation = $event"
+    />
+  </template>
+</template>

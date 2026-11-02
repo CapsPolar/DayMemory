@@ -1,124 +1,21 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
     <title>DayMemory</title>
-    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/style.css" />
     <script src="/crypto-js.min.js"></script>
-
-    <!-- PWA: installable + offline support -->
-    <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#4f46e5">
-    <link rel="icon" href="/icon-192.png">
-    <link rel="apple-touch-icon" href="/icon-192.png">
-</head>
-<body>
-
-    <div id="auth-modal" class="modal-overlay">
-        <div class="modal-content" id="auth-modal-content" style="width: 100%; max-width: 100%; height: 100%; max-height: 100dvh; border-radius: 0; position: relative; padding: 0.75rem 0.25rem 4rem 0.25rem; overflow-y: auto;">
-
-            <div id="auth-form-panel" class="visual-hidden">
-                <h2>Unlock Vault</h2>
-                <p>Your continuous timeline remains zero-knowledge encrypted locally.</p>
-                <p id="auth-first-time-hint" class="status-msg visual-hidden" style="display:block; margin: -0.25rem 0 0.75rem 0; color: var(--text-muted);">Set your vault password. You can always change it in settings.</p>
-                <form id="auth-form">
-                    <input type="password" id="password-input" placeholder="Master Password" required autocomplete="off">
-                    <button type="submit">Unlock</button>
-                </form>
-            </div>
-
-            <div id="buffer-panel">
-                <h2>Quick Buffer</h2>
-                <p>Write freely without unlocking. Stored locally and unencrypted right here until you unlock the vault — then it's merged into your continuous timeline and cleared.</p>
-
-                <div id="buffer-form" class="editor-card" style="margin-top: 1rem;">
-                    <label for="buffer-input" style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Quick Thoughts (Buffer):</label>
-                    <textarea id="buffer-input" placeholder="Jot something down..." style="min-height: 200px;"></textarea>
-                    <span id="buffer-save-status" class="status-msg"></span>
-                </div>
-            </div>
-
-            <button type="button" id="lock-view-toggle-btn" style="position: absolute; bottom: 0.6rem; right: 0.4rem; width: auto; margin: 0; font-size: 0.8rem; padding: 0.4rem 0.8rem; border-radius: 20px;">🔑 Switch to Unlock</button>
-        </div>
-    </div>
-
-    <div id="main-app" class="app-container visual-hidden">
-
-        <header class="app-header">
-            <h1 id="view-title">Thoughts</h1>
-            <button id="lock-btn" class="icon-btn" title="Lock Vault">🔒</button>
-        </header>
-
-        <div class="view-content-wrapper">
-
-            <section id="view-home" class="nav-view-panel active">
-                <div id="memory-form" class="editor-card">
-                    <label id="form-label" for="memory-input" style="display: block; margin-bottom: 0.5rem; font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">Continuous Stream of Thoughts:</label>
-                    <textarea id="memory-input" placeholder="Write your thoughts freely here..." style="min-height: calc(100vh - 200px); min-height: calc(100dvh - 200px);"></textarea>
-                    <span id="memory-save-status" class="status-msg"></span>
-                </div>
-            </section>
-
-            <section id="view-settings" class="nav-view-panel">
-                <div class="section-title">Data Administration</div>
-                <div class="panel-box">
-                    <p class="section-desc" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">Manage encrypted vault string backups and security settings directly.</p>
-                    <div class="backup-actions" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                        <button id="export-btn" class="secondary-btn" style="flex: 1;">Export Vault String</button>
-                        <button id="import-btn" class="secondary-btn" style="flex: 1;">Import Vault String</button>
-                        <button id="change-pwd-btn" class="secondary-btn" style="flex: 1; min-width: 150px;">🔑 Change Password</button>
-                    </div>
-
-                    <div id="backup-io-zone" class="visual-hidden" style="margin-top: 1rem;">
-                        <textarea id="backup-textarea" placeholder="Paste data string here for restoration..." style="min-height: 120px;"></textarea>
-                        <button id="backup-action-submit-btn" style="margin-top: 0.5rem;">Execute Backup Change</button>
-                        <span id="backup-status-msg" class="status-msg"></span>
-                    </div>
-
-                    <div id="change-pwd-zone" class="visual-hidden" style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 1rem;">
-                        <div class="input-group">
-                            <label for="old-password-input">Confirm Current Master Password</label>
-                            <input type="password" id="old-password-input" autocomplete="off">
-                        </div>
-                        <div class="input-group">
-                            <label for="new-password-input">New Master Password</label>
-                            <input type="password" id="new-password-input" autocomplete="off">
-                        </div>
-                        <div class="input-group">
-                            <label for="new-password-confirm">Confirm New Master Password</label>
-                            <input type="password" id="new-password-confirm" autocomplete="off">
-                        </div>
-                        <button id="submit-change-pwd-btn" class="danger-btn">Update Vault Security Key</button>
-                        <span id="pwd-status-msg" class="status-msg"></span>
-                    </div>
-                </div>
-            </section>
-
-        </div>
-
-        <nav class="bottom-nav">
-            <button class="nav-item active" data-target="view-home" style="width: 50%;">
-                <span class="nav-icon">📝</span>
-                <span class="nav-label">Thoughts</span>
-            </button>
-            <button class="nav-item" data-target="view-settings" style="width: 50%;">
-                <span class="nav-icon">⚙️</span>
-                <span class="nav-label">Settings</span>
-            </button>
-        </nav>
-    </div>
-
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#4f46e5" />
+    <link rel="icon" href="/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+  </head>
+  <body>
+    <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
-
-    <!-- PWA: register service worker for offline support -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/service-worker.js')
-                    .catch((err) => console.error('Service worker registration failed:', err));
-            });
-        }
-    </script>
-</body>
+  </body>
 </html>
