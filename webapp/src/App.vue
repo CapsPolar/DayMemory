@@ -8,19 +8,8 @@ import { IndexedDBAdapter } from "../adapters/IndexedDBAdapter";
 import AuthModal from "./components/AuthModal.vue";
 import MainApp from "./components/MainApp.vue";
 
-const QUICK_OPEN = "\n[QUICK]\n";
-const QUICK_CLOSE = "\n[/QUICK]\n";
-
-function unwrapQuick(stored: string): string {
-  return stored.replace(/\n?\[\/?QUICK\]\n?/g, "").replace(/^\n+|\n+$/g, "");
-}
-
-function wrapQuick(inner: string): string {
-  return `${QUICK_OPEN}${unwrapQuick(inner)}${QUICK_CLOSE}`;
-}
-
 function hasRealBufferContent(stored: string): boolean {
-  return unwrapQuick(stored).replace(/\[TIME [^\]]*\]:/g, "").trim().length > 0;
+  return stored.replace(/\[TIME [^\]]*\]:/g, "").trim().length > 0;
 }
 
 const isUnlocked = ref(false);
@@ -33,7 +22,6 @@ const unlocking = ref(false);
 const bufferText = ref("");
 const bufferSaveStatus = ref("");
 const content = ref("");
-const saveStatus = ref("");
 const activeView = ref<"thoughts" | "settings">("thoughts");
 
 const backupVisible = ref(false);
@@ -48,9 +36,7 @@ const passwordStatus = ref("");
 
 let vaultService: VaultService | null = null;
 let bufferService: BufferService | null = null;
-let memoryAutosaveTimeout: ReturnType<typeof setTimeout> | null = null;
 let bufferAutosaveTimeout: ReturnType<typeof setTimeout> | null = null;
-let memoryStatusTimeout: ReturnType<typeof setTimeout> | null = null;
 let bufferStatusTimeout: ReturnType<typeof setTimeout> | null = null;
 let passwordReloadTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -59,15 +45,10 @@ function clearTimer(timer: ReturnType<typeof setTimeout> | null): null {
   return null;
 }
 
-function showSavedStatus(target: typeof saveStatus, isBuffer = false): void {
+function showSavedStatus(target: typeof bufferSaveStatus): void {
   target.value = "✓ Saved";
-  if (isBuffer) {
-    bufferStatusTimeout = clearTimer(bufferStatusTimeout);
-    bufferStatusTimeout = setTimeout(() => (target.value = ""), 1500);
-  } else {
-    memoryStatusTimeout = clearTimer(memoryStatusTimeout);
-    memoryStatusTimeout = setTimeout(() => (target.value = ""), 1500);
-  }
+  bufferStatusTimeout = clearTimer(bufferStatusTimeout);
+  bufferStatusTimeout = setTimeout(() => (target.value = ""), 1500);
 }
 
 function describeError(error: unknown): string {
@@ -83,9 +64,9 @@ async function initialize(): Promise<void> {
     firstTime.value = !(await vaultService.hasVault());
 
     const storedBuffer = await bufferService.getBuffer();
-    const initialText = withFreshTimestamp(unwrapQuick(storedBuffer));
+    const initialText = withFreshTimestamp(storedBuffer);
     bufferText.value = initialText;
-    await bufferService.saveBuffer(wrapQuick(initialText));
+    await bufferService.saveBuffer(initialText);
   } catch (error) {
     console.error(error);
     storageError.value = `DayMemory couldn't access its local IndexedDB storage (${describeError(error)}). Check that site data is available and try again. Private/incognito mode or blocked site data can cause this.`;
@@ -103,7 +84,7 @@ async function mergeBufferIntoVault(): Promise<boolean> {
     return false;
   }
 
-  await vaultService.appendContent(wrapQuick(pending));
+  await vaultService.appendContent(pending);
   await bufferService.clear();
   return true;
 }
@@ -136,14 +117,7 @@ async function unlock(): Promise<void> {
   }
 
   isUnlocked.value = true;
-  const currentContent = withFreshTimestamp(vaultService.getContent());
-  content.value = currentContent;
-  try {
-    await vaultService.saveContent(currentContent);
-  } catch (error) {
-    console.error(error);
-    saveStatus.value = "⚠ Save failed";
-  }
+  content.value = vaultService.getContent();
 
   if (merged) {
     window.setTimeout(() => {
@@ -152,24 +126,6 @@ async function unlock(): Promise<void> {
       );
     }, 150);
   }
-}
-
-function updateContent(value: string): void {
-  content.value = value;
-  memoryAutosaveTimeout = clearTimer(memoryAutosaveTimeout);
-  memoryAutosaveTimeout = setTimeout(() => void saveCurrentContent(), 500);
-}
-
-async function saveCurrentContent(): Promise<void> {
-  if (!vaultService) return;
-  try {
-    await vaultService.saveContent(content.value);
-  } catch (error) {
-    console.error(error);
-    saveStatus.value = "⚠ Save failed";
-    return;
-  }
-  showSavedStatus(saveStatus);
 }
 
 function updateBuffer(value: string): void {
@@ -181,13 +137,13 @@ function updateBuffer(value: string): void {
 async function saveCurrentBuffer(): Promise<void> {
   if (!bufferService) return;
   try {
-    await bufferService.saveBuffer(wrapQuick(bufferText.value));
+    await bufferService.saveBuffer(bufferText.value);
   } catch (error) {
     console.error(error);
     bufferSaveStatus.value = "⚠ Save failed";
     return;
   }
-  showSavedStatus(bufferSaveStatus, true);
+  showSavedStatus(bufferSaveStatus);
 }
 
 function navigate(view: "thoughts" | "settings"): void {
@@ -295,29 +251,19 @@ async function submitPasswordChange(): Promise<void> {
   passwordReloadTimeout = setTimeout(() => window.location.reload(), 1500);
 }
 
-async function lockVault(): Promise<void> {
-  const hasPendingSave = memoryAutosaveTimeout !== null;
-  memoryAutosaveTimeout = clearTimer(memoryAutosaveTimeout);
-  try {
-    if (hasPendingSave && vaultService) await vaultService.saveContent(content.value);
-  } catch (error) {
-    console.error(error);
-    window.alert(`Couldn't save the latest changes before locking (${describeError(error)}).`);
-  } finally {
-    vaultService?.lock();
-    content.value = "";
-    isUnlocked.value = false;
-    mode.value = "buffer";
-    password.value = "";
-  }
+function lockVault(): Promise<void> {
+  vaultService?.lock();
+  content.value = "";
+  isUnlocked.value = false;
+  mode.value = "buffer";
+  password.value = "";
+  return Promise.resolve();
 }
 
 onMounted(() => void initialize());
 
 onBeforeUnmount(() => {
-  memoryAutosaveTimeout = clearTimer(memoryAutosaveTimeout);
   bufferAutosaveTimeout = clearTimer(bufferAutosaveTimeout);
-  memoryStatusTimeout = clearTimer(memoryStatusTimeout);
   bufferStatusTimeout = clearTimer(bufferStatusTimeout);
   passwordReloadTimeout = clearTimer(passwordReloadTimeout);
   vaultService?.lock();
@@ -354,7 +300,6 @@ onBeforeUnmount(() => {
       v-else
       :active-view="activeView"
       :content="content"
-      :save-status="saveStatus"
       :backup-visible="backupVisible"
       :change-password-visible="changePasswordVisible"
       :backup-mode="backupMode"
@@ -366,7 +311,6 @@ onBeforeUnmount(() => {
       :password-status="passwordStatus"
       @lock="lockVault"
       @navigate="navigate"
-      @update:content="updateContent"
       @export-vault="exportVault"
       @import-vault="importVault"
       @toggle-password-panel="togglePasswordPanel"

@@ -5,7 +5,6 @@ import SettingsView from "./SettingsView.vue";
 defineProps<{
   activeView: "thoughts" | "settings";
   content: string;
-  saveStatus: string;
   backupVisible: boolean;
   changePasswordVisible: boolean;
   backupMode: "export" | "import";
@@ -20,7 +19,6 @@ defineProps<{
 const emit = defineEmits<{
   lock: [];
   navigate: [view: "thoughts" | "settings"];
-  "update:content": [value: string];
   exportVault: [];
   importVault: [];
   togglePasswordPanel: [];
@@ -36,7 +34,7 @@ const emit = defineEmits<{
 <template>
   <div class="app-container">
     <header class="app-header">
-      <h1>{{ activeView === "thoughts" ? "Thoughts" : "Settings" }}</h1>
+      <h1>{{ activeView === "thoughts" ? "History" : "Settings" }}</h1>
       <button class="icon-btn" title="Lock Vault" aria-label="Lock Vault" @click="emit('lock')">
         🔒
       </button>
@@ -45,9 +43,7 @@ const emit = defineEmits<{
     <main class="view-content-wrapper">
       <ThoughtsView
         v-if="activeView === 'thoughts'"
-        :model-value="content"
-        :save-status="saveStatus"
-        @update:model-value="emit('update:content', $event)"
+        :content="content"
       />
       <SettingsView
         v-else
@@ -79,8 +75,8 @@ const emit = defineEmits<{
         :aria-current="activeView === 'thoughts' ? 'page' : undefined"
         @click="emit('navigate', 'thoughts')"
       >
-        <span class="nav-icon">📝</span>
-        <span class="nav-label">Thoughts</span>
+        <span class="nav-icon">📜</span>
+        <span class="nav-label">History</span>
       </button>
       <button
         class="nav-item"
