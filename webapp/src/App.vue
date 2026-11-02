@@ -1,3 +1,4 @@
+<!-- App.vue -->
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from "vue";
 import { BufferService } from "@core/services/BufferService";
@@ -125,6 +126,17 @@ async function unlock(): Promise<void> {
         "✅ Your pending buffer entries have been merged and securely encrypted into your vault. The local buffer is now cleared."
       );
     }, 150);
+  }
+}
+
+async function updateVaultContent(newContent: string): Promise<void> {
+  try {
+    if (!vaultService) throw new Error("Vault service is not initialized.");
+    await vaultService.saveContent(newContent);
+    content.value = newContent;
+  } catch (error) {
+    console.error(error);
+    window.alert(`Failed to save section edits: ${describeError(error)}`);
   }
 }
 
@@ -320,6 +332,7 @@ onBeforeUnmount(() => {
       @update:old-password="oldPassword = $event"
       @update:new-password="newPassword = $event"
       @update:password-confirmation="passwordConfirmation = $event"
+      @update:content="updateVaultContent"
     />
   </template>
 </template>

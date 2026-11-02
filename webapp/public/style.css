@@ -432,6 +432,71 @@ button:active {
     min-height: 120px;
 }
 
+.history-section-block {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+}
+
+.history-section-block:not(:last-child) {
+    border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.section-text {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.section-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.5rem;
+}
+
+.edit-section-btn {
+    width: auto;
+    padding: 0.35rem 0.65rem;
+    font-size: 0.8rem;
+}
+
+.section-editor-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    padding: max(0.75rem, env(safe-area-inset-top, 0px))
+        0.75rem
+        max(0.75rem, env(safe-area-inset-bottom, 0px));
+    background-color: var(--bg-main);
+}
+
+.section-editor-header h2 {
+    font-size: 1.1rem;
+}
+
+.section-editor-textarea {
+    flex: 1;
+    min-height: 0;
+    resize: none;
+}
+
+.section-editor-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.section-editor-actions button {
+    width: auto;
+}
+
+.section-editor-actions button:last-child {
+    flex: 1;
+}
+
 .backup-submit {
     margin-top: 0.5rem;
 }

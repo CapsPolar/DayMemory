@@ -1,3 +1,4 @@
+<!-- MainApp.vue -->
 <script setup lang="ts">
 import ThoughtsView from "./ThoughtsView.vue";
 import SettingsView from "./SettingsView.vue";
@@ -28,6 +29,7 @@ const emit = defineEmits<{
   "update:oldPassword": [value: string];
   "update:newPassword": [value: string];
   "update:passwordConfirmation": [value: string];
+  "update:content": [value: string];
 }>();
 </script>
 
@@ -44,6 +46,7 @@ const emit = defineEmits<{
       <ThoughtsView
         v-if="activeView === 'thoughts'"
         :content="content"
+        @update:content="emit('update:content', $event)"
       />
       <SettingsView
         v-else
