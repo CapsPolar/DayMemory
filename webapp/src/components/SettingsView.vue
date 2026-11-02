@@ -1,6 +1,7 @@
 <!-- SettingsView.vue -->
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { getTheme, setTheme, type Theme } from "../theme";
 
 const props = defineProps<{
   backupVisible: boolean;
@@ -49,6 +50,18 @@ const modeInfo = {
 const info = computed(() => modeInfo[props.backupMode]);
 const isImport = computed(() => props.backupMode.includes("import"));
 
+const themes: { value: Theme; label: string }[] = [
+  { value: "system", label: "System" },
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" }
+];
+const theme = ref<Theme>(getTheme());
+
+function chooseTheme(value: Theme): void {
+  theme.value = value;
+  setTheme(value);
+}
+
 const fileInputRef = ref<HTMLInputElement | null>(null);
 
 function triggerFileInput(): void {
@@ -57,6 +70,21 @@ function triggerFileInput(): void {
 </script>
 
 <template>
+  <div class="list-row">
+    Theme
+    <div class="segmented" role="group" aria-label="Theme">
+      <button
+        v-for="option in themes"
+        :key="option.value"
+        type="button"
+        :class="{ active: theme === option.value }"
+        :aria-pressed="theme === option.value"
+        @click="chooseTheme(option.value)"
+      >
+        {{ option.label }}
+      </button>
+    </div>
+  </div>
   <button class="list-row" @click="emit('openExport', 'encrypted')">Export vault (encrypted)</button>
   <button class="list-row" @click="emit('openExport', 'unencrypted')">
     Export vault (unencrypted)

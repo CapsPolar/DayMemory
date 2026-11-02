@@ -35,9 +35,15 @@ const bufferSections = computed<BufferSection[]>(() => {
   return sections;
 });
 
-function updateBufferSection(index: number, text: string): void {
+// Whitespace after a timestamp tag is kept in the stored text but hidden in the
+// textarea, so an empty section is truly empty and shows its placeholder.
+function leadingSpace(text: string): string {
+  return text.match(/^\s*/)?.[0] ?? "";
+}
+
+function updateBufferSection(index: number, typed: string): void {
   const updatedSections = bufferSections.value.map((section, sectionIndex) =>
-    sectionIndex === index ? { ...section, text } : section
+    sectionIndex === index ? { ...section, text: leadingSpace(section.text) + typed } : section
   );
   emit(
     "update:bufferText",
@@ -78,8 +84,8 @@ function updateBufferSection(index: number, text: string): void {
         <p v-if="section.timestamp" class="entry-time">{{ section.timestamp }}</p>
         <textarea
           :id="index === 0 ? 'buffer-input' : undefined"
-          :value="section.text"
-          :placeholder="index === 0 ? 'Start writing…' : undefined"
+          :value="section.text.slice(leadingSpace(section.text).length)"
+          :placeholder="index === bufferSections.length - 1 ? 'Write here' : undefined"
           class="write-area"
           :aria-label="`Writing section ${index + 1}`"
           @input="updateBufferSection(index, ($event.target as HTMLTextAreaElement).value)"

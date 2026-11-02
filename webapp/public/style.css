@@ -1,36 +1,28 @@
 :root {
     color-scheme: light dark;
-    --bg: #ffffff;
-    --surface: #f3f4f6;
-    --text: #111418;
-    --muted: #6b7280;
-    --line: #e5e7eb;
-    --accent: #3355c0;
-    --on-accent: #ffffff;
-    --danger: #b42318;
-    --hl: rgba(51, 85, 192, 0.18);
-    --toast-bg: #1f2937;
-    --toast-fg: #f9fafb;
+    --bg: light-dark(#ffffff, #0e1013);
+    --surface: light-dark(#f3f4f6, #181b20);
+    --text: light-dark(#111418, #eceef1);
+    --muted: light-dark(#6b7280, #9097a3);
+    --line: light-dark(#e5e7eb, #23272e);
+    --accent: light-dark(#3355c0, #8aa4f5);
+    --on-accent: light-dark(#ffffff, #0b1020);
+    --danger: light-dark(#b42318, #f2877d);
+    --hl: light-dark(rgba(51, 85, 192, 0.18), rgba(138, 164, 245, 0.25));
+    --toast-bg: light-dark(#1f2937, #e5e7eb);
+    --toast-fg: light-dark(#f9fafb, #111418);
     --gutter: 12px;
     --bar: 48px;
     --top: env(safe-area-inset-top, 0px);
     --bottom: env(safe-area-inset-bottom, 0px);
 }
 
-@media (prefers-color-scheme: dark) {
-    :root {
-        --bg: #0e1013;
-        --surface: #181b20;
-        --text: #eceef1;
-        --muted: #9097a3;
-        --line: #23272e;
-        --accent: #8aa4f5;
-        --on-accent: #0b1020;
-        --danger: #f2877d;
-        --hl: rgba(138, 164, 245, 0.25);
-        --toast-bg: #e5e7eb;
-        --toast-fg: #111418;
-    }
+:root[data-theme="light"] {
+    color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+    color-scheme: dark;
 }
 
 * {
@@ -388,6 +380,28 @@ mark.search-highlight.active {
 .row-note {
     font-size: 12px;
     color: var(--danger);
+}
+
+.segmented {
+    display: flex;
+    padding: 2px;
+    background: var(--surface);
+    border-radius: 8px;
+}
+
+.segmented button {
+    height: 28px;
+    padding: 0 10px;
+    background: none;
+    border: 0;
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--muted);
+}
+
+.segmented button.active {
+    background: var(--bg);
+    color: var(--text);
 }
 
 .panel {

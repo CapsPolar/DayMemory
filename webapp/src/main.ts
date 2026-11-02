@@ -1,5 +1,8 @@
 import { createApp } from "vue";
 import App from "./App.vue";
+import { applyTheme, getTheme } from "./theme";
+
+applyTheme(getTheme());
 
 createApp(App).mount("#app");
 
