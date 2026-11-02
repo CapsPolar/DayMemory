@@ -35,15 +35,18 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="app-container">
+  <div class="app">
     <header class="app-header">
       <h1>{{ activeView === "thoughts" ? "History" : "Settings" }}</h1>
       <button class="icon-btn" title="Lock Vault" aria-label="Lock Vault" @click="emit('lock')">
-        🔒
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="5" y="11" width="14" height="9" rx="2" />
+          <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+        </svg>
       </button>
     </header>
 
-    <main class="view-content-wrapper">
+    <main class="view">
       <ThoughtsView
         v-if="activeView === 'thoughts'"
         :content="content"
@@ -80,8 +83,11 @@ const emit = defineEmits<{
         :aria-current="activeView === 'thoughts' ? 'page' : undefined"
         @click="emit('navigate', 'thoughts')"
       >
-        <span class="nav-icon">📜</span>
-        <span class="nav-label">History</span>
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="8.5" />
+          <polyline points="12 7.5 12 12 15 14" />
+        </svg>
+        History
       </button>
       <button
         class="nav-item"
@@ -89,8 +95,13 @@ const emit = defineEmits<{
         :aria-current="activeView === 'settings' ? 'page' : undefined"
         @click="emit('navigate', 'settings')"
       >
-        <span class="nav-icon">⚙️</span>
-        <span class="nav-label">Settings</span>
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+          <line x1="4" y1="7" x2="20" y2="7" />
+          <line x1="4" y1="17" x2="20" y2="17" />
+          <circle cx="9" cy="7" r="2.2" />
+          <circle cx="15" cy="17" r="2.2" />
+        </svg>
+        Settings
       </button>
     </nav>
   </div>

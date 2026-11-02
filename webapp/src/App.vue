@@ -24,6 +24,7 @@ const bufferText = ref("");
 const bufferSaveStatus = ref("");
 const content = ref("");
 const activeView = ref<"thoughts" | "settings">("thoughts");
+const toast = ref("");
 
 const backupVisible = ref(false);
 const changePasswordVisible = ref(false);
@@ -40,14 +41,21 @@ let bufferService: BufferService | null = null;
 let bufferAutosaveTimeout: ReturnType<typeof setTimeout> | null = null;
 let bufferStatusTimeout: ReturnType<typeof setTimeout> | null = null;
 let passwordReloadTimeout: ReturnType<typeof setTimeout> | null = null;
+let toastTimeout: ReturnType<typeof setTimeout> | null = null;
 
 function clearTimer(timer: ReturnType<typeof setTimeout> | null): null {
   if (timer !== null) clearTimeout(timer);
   return null;
 }
 
+function showToast(message: string): void {
+  toast.value = message;
+  toastTimeout = clearTimer(toastTimeout);
+  toastTimeout = setTimeout(() => (toast.value = ""), 3000);
+}
+
 function showSavedStatus(target: typeof bufferSaveStatus): void {
-  target.value = "✓ Saved";
+  target.value = "Saved";
   bufferStatusTimeout = clearTimer(bufferStatusTimeout);
   bufferStatusTimeout = setTimeout(() => (target.value = ""), 1500);
 }
@@ -103,9 +111,7 @@ async function unlock(): Promise<void> {
   } catch (error) {
     console.error(error);
     vaultService.lock();
-    window.alert(
-      `Couldn't read or write the vault in IndexedDB (${describeError(error)}). Nothing was changed; try again.`
-    );
+    showToast(`Couldn't read or write the vault (${describeError(error)}). Nothing was changed.`);
     return;
   } finally {
     unlocking.value = false;
@@ -113,20 +119,14 @@ async function unlock(): Promise<void> {
 
   if (!success) {
     password.value = "";
-    window.alert("Incorrect password.");
+    showToast("Incorrect password.");
     return;
   }
 
   isUnlocked.value = true;
   content.value = vaultService.getContent();
 
-  if (merged) {
-    window.setTimeout(() => {
-      window.alert(
-        "✅ Your pending buffer entries have been merged and securely encrypted into your vault. The local buffer is now cleared."
-      );
-    }, 150);
-  }
+  if (merged) showToast("Your writing was added to the vault.");
 }
 
 async function updateVaultContent(newContent: string): Promise<void> {
@@ -136,7 +136,7 @@ async function updateVaultContent(newContent: string): Promise<void> {
     content.value = newContent;
   } catch (error) {
     console.error(error);
-    window.alert(`Failed to save section edits: ${describeError(error)}`);
+    showToast(`Failed to save changes: ${describeError(error)}`);
   }
 }
 
@@ -152,7 +152,7 @@ async function saveCurrentBuffer(): Promise<void> {
     await bufferService.saveBuffer(bufferText.value);
   } catch (error) {
     console.error(error);
-    bufferSaveStatus.value = "⚠ Save failed";
+    bufferSaveStatus.value = "Save failed";
     return;
   }
   showSavedStatus(bufferSaveStatus);
@@ -181,7 +181,7 @@ async function openExport(type: "encrypted" | "unencrypted"): Promise<void> {
     }
   } catch (error) {
     console.error(error);
-    backupStatus.value = "⚠ Couldn't read vault content from storage.";
+    backupStatus.value = "Couldn't read vault content from storage.";
   }
 }
 
@@ -219,7 +219,7 @@ function handleFileImportUpload(event: Event): void {
     }
   };
   reader.onerror = () => {
-    backupStatus.value = "⚠ Failed to read the selected file.";
+    backupStatus.value = "Failed to read the selected file.";
   };
   reader.readAsText(file);
   target.value = ""; // Reset input so the same file can be selected again if needed
@@ -235,18 +235,18 @@ async function submitBackup(actionType: "clipboard" | "file" | "restore"): Promi
     if (actionType === "clipboard") {
       try {
         await navigator.clipboard.writeText(backupText.value);
-        backupStatus.value = `${label} copied to clipboard!`;
+        backupStatus.value = `${label} copied to clipboard.`;
       } catch (error) {
         console.error(error);
-        backupStatus.value = `⚠ Couldn't copy ${label.toLowerCase()} to clipboard.`;
+        backupStatus.value = `Couldn't copy ${label.toLowerCase()} to clipboard.`;
       }
     } else {
       try {
         downloadFile(filename, backupText.value);
-        backupStatus.value = `${label} exported as file!`;
+        backupStatus.value = `${label} downloaded.`;
       } catch (error) {
         console.error(error);
-        backupStatus.value = `⚠ Couldn't trigger file download.`;
+        backupStatus.value = "Couldn't start the file download.";
       }
     }
     return;
@@ -273,11 +273,11 @@ async function submitBackup(actionType: "clipboard" | "file" | "restore"): Promi
     }
   } catch (error) {
     console.error(error);
-    backupStatus.value = "⚠ Couldn't write the import data to storage. Nothing was changed.";
+    backupStatus.value = "Couldn't write the import data to storage. Nothing was changed.";
     return;
   }
-  window.alert("Vault import successful! App environment will now refresh.");
-  window.location.reload();
+  showToast("Vault imported. Reloading…");
+  passwordReloadTimeout = setTimeout(() => window.location.reload(), 1200);
 }
 
 function togglePasswordPanel(): void {
@@ -295,15 +295,15 @@ async function submitPasswordChange(): Promise<void> {
   const confirmation = passwordConfirmation.value.trim();
 
   if (!old || !next || !confirmation) {
-    passwordStatus.value = "❌ Please fulfill all verification parameters.";
+    passwordStatus.value = "Please fill in all fields.";
     return;
   }
   if (next !== confirmation) {
-    passwordStatus.value = "❌ Mismatch across new target password entries.";
+    passwordStatus.value = "New passwords don't match.";
     return;
   }
   if (old === next) {
-    passwordStatus.value = "❌ New password must be distinct from old baseline configuration.";
+    passwordStatus.value = "New password must differ from the current one.";
     return;
   }
 
@@ -313,15 +313,15 @@ async function submitPasswordChange(): Promise<void> {
     changed = await vaultService.changePassword(old, next);
   } catch (error) {
     console.error(error);
-    passwordStatus.value = "❌ Couldn't write the re-encrypted vault to storage. Password unchanged.";
+    passwordStatus.value = "Couldn't save the re-encrypted vault. Password unchanged.";
     return;
   }
   if (!changed) {
-    passwordStatus.value = "❌ Confirmed old master password validation fails.";
+    passwordStatus.value = "Current password is incorrect.";
     return;
   }
 
-  passwordStatus.value = "🎉 Encryption key swapped! Reloading engine state...";
+  passwordStatus.value = "Password updated. Reloading…";
   passwordReloadTimeout = setTimeout(() => window.location.reload(), 1500);
 }
 
@@ -340,22 +340,19 @@ onBeforeUnmount(() => {
   bufferAutosaveTimeout = clearTimer(bufferAutosaveTimeout);
   bufferStatusTimeout = clearTimer(bufferStatusTimeout);
   passwordReloadTimeout = clearTimer(passwordReloadTimeout);
+  toastTimeout = clearTimer(toastTimeout);
   vaultService?.lock();
 });
 </script>
 
 <template>
-  <div v-if="storageError" class="modal-overlay">
-    <div class="modal-content storage-error">
-      <h2>Storage unavailable</h2>
-      <p class="status-msg">{{ storageError }}</p>
-    </div>
-  </div>
-  <div v-else-if="!initialized" class="modal-overlay">
-    <div class="modal-content storage-error">
-      <h2>Opening DayMemory…</h2>
-    </div>
-  </div>
+  <main v-if="storageError" class="splash">
+    <h2>Storage unavailable</h2>
+    <p>{{ storageError }}</p>
+  </main>
+  <main v-else-if="!initialized" class="splash">
+    <h2>Opening DayMemory…</h2>
+  </main>
   <template v-else>
     <AuthModal
       v-if="!isUnlocked"
@@ -398,4 +395,8 @@ onBeforeUnmount(() => {
       @update:content="updateVaultContent"
     />
   </template>
+
+  <Transition name="toast">
+    <p v-if="toast" class="toast" role="status">{{ toast }}</p>
+  </Transition>
 </template>

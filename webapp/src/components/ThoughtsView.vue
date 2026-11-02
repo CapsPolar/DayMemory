@@ -300,192 +300,85 @@ function saveSection(section: HistorySection): void {
 </script>
 
 <template>
-  <section class="nav-view-panel active">
-    <div class="editor-card history-card">
-      <div class="history-header">
-        <span class="memory-label">Continuous Timeline History:</span>
-      </div>
+  <div v-if="content" class="search">
+    <input
+      v-model="searchQuery"
+      type="search"
+      placeholder="Search history"
+      aria-label="Search history"
+    />
+    <span class="search-count" aria-live="polite">
+      <template v-if="searchQuery.trim()">
+        {{ totalMatches > 0 ? `${activeMatchIndex + 1} of ${totalMatches}` : "No results" }}
+      </template>
+    </span>
+    <button
+      type="button"
+      class="icon-btn"
+      :disabled="totalMatches === 0"
+      aria-label="Previous match"
+      @click="prevMatch"
+    >
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polyline points="6 15 12 9 18 15" /></svg>
+    </button>
+    <button
+      type="button"
+      class="icon-btn"
+      :disabled="totalMatches === 0"
+      aria-label="Next match"
+      @click="nextMatch"
+    >
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polyline points="6 9 12 15 18 9" /></svg>
+    </button>
+  </div>
 
-      <!-- Sticky Search Bar Toolbar -->
-      <div v-if="content" class="search-bar sticky-search">
-        <input
-          v-model="searchQuery"
-          type="search"
-          placeholder="Search history..."
-          aria-label="Search timeline history"
-          class="search-input"
-        />
-        <div class="search-controls">
-          <span class="search-counter" aria-live="polite">
-            <template v-if="searchQuery.trim()">
-              {{ totalMatches > 0 ? `${activeMatchIndex + 1} of ${totalMatches}` : 'No results' }}
-            </template>
-          </span>
-          <button
-            type="button"
-            class="secondary-btn search-nav-btn"
-            :disabled="totalMatches === 0"
-            aria-label="Previous match"
-            @click="prevMatch"
-          >
-            ▲
-          </button>
-          <button
-            type="button"
-            class="secondary-btn search-nav-btn"
-            :disabled="totalMatches === 0"
-            aria-label="Next match"
-            @click="nextMatch"
-          >
-            ▼
-          </button>
-        </div>
-      </div>
+  <p v-if="!content" class="empty">Your vault history is empty.</p>
 
-      <div v-if="!content" class="memory-display" tabindex="0">
-        Your vault history is empty.
-      </div>
-
-      <div v-else class="history-sections-container">
-        <div
-          v-for="section in displaySections"
-          :key="section.id"
-          class="history-section-block"
+  <article v-for="section in displaySections" :key="section.id" class="entry">
+    <p class="entry-text">
+      <span v-if="section.timestamp" class="entry-time">
+        <template
+          v-for="(seg, idx) in renderSegments(section.id, 'timestamp', section.timestamp)"
+          :key="idx"
         >
-          <div class="memory-display section-text" tabindex="0">
-            <!-- Timestamp displaying with highlights -->
-            <span v-if="section.timestamp" class="section-timestamp">
-              <template
-                v-for="(seg, idx) in renderSegments(section.id, 'timestamp', section.timestamp)"
-                :key="idx"
-              >
-                <mark
-                  v-if="seg.isMatch"
-                  class="search-highlight"
-                  :class="{ active: isMatchActive(section.id, 'timestamp', seg.start, seg.text.length) }"
-                >{{ seg.text }}</mark>
-                <template v-else>{{ seg.text }}</template>
-              </template>
-            </span>
+          <mark
+            v-if="seg.isMatch"
+            class="search-highlight"
+            :class="{ active: isMatchActive(section.id, 'timestamp', seg.start, seg.text.length) }"
+          >{{ seg.text }}</mark>
+          <template v-else>{{ seg.text }}</template>
+        </template>
+      </span>
+      <span>
+        <template
+          v-for="(seg, idx) in renderSegments(section.id, 'text', section.text)"
+          :key="idx"
+        >
+          <mark
+            v-if="seg.isMatch"
+            class="search-highlight"
+            :class="{ active: isMatchActive(section.id, 'text', seg.start, seg.text.length) }"
+          >{{ seg.text }}</mark>
+          <template v-else>{{ seg.text }}</template>
+        </template>
+      </span>
+    </p>
+    <button type="button" class="text-btn" aria-label="Edit entry" @click="startEditing(section)">
+      Edit
+    </button>
+  </article>
 
-            <!-- Main text displaying with highlights -->
-            <span>
-              <template
-                v-for="(seg, idx) in renderSegments(section.id, 'text', section.text)"
-                :key="idx"
-              >
-                <mark
-                  v-if="seg.isMatch"
-                  class="search-highlight"
-                  :class="{ active: isMatchActive(section.id, 'text', seg.start, seg.text.length) }"
-                >{{ seg.text }}</mark>
-                <template v-else>{{ seg.text }}</template>
-              </template>
-            </span>
-          </div>
-          <div class="section-actions">
-            <button
-              type="button"
-              class="secondary-btn edit-section-btn"
-              :aria-label="`Edit section ${section.id}`"
-              @click="startEditing(section)"
-            >
-              Edit section
-            </button>
-          </div>
-        </div>
-      </div>
+  <Teleport to="body">
+    <div v-if="editingSectionId" class="sheet">
+      <header class="app-header">
+        <button type="button" class="text-btn muted" @click="cancelEditing">Cancel</button>
+        <h1>Edit entry</h1>
+        <button type="button" class="text-btn" @click="editingSection && saveSection(editingSection)">
+          Save
+        </button>
+      </header>
+      <p v-if="editTimestamp" class="entry-time">{{ editTimestamp }}</p>
+      <textarea v-model="editText" aria-label="Entry content" />
     </div>
-
-    <Teleport to="body">
-      <div v-if="editingSectionId" class="section-editor-overlay">
-        <div class="section-editor-header">
-          <h2>Edit timeline section</h2>
-        </div>
-        <textarea
-          v-if="editTimestamp"
-          :value="editTimestamp"
-          class="section-timestamp-textarea"
-          aria-label="Uneditable timestamp"
-          readonly
-          rows="1"
-        />
-        <textarea
-          v-model="editText"
-          class="backup-textarea section-editor-textarea"
-          aria-label="Timeline section content"
-        />
-        <div class="section-editor-actions">
-          <button
-            type="button"
-            class="secondary-btn"
-            @click="cancelEditing"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            @click="editingSection && saveSection(editingSection)"
-          >
-            Save
-          </button>
-        </div>
-      </div>
-    </Teleport>
-  </section>
+  </Teleport>
 </template>
-
-<style scoped>
-.sticky-search {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background-color: var(--card-bg, #ffffff);
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--border-color, #eee);
-  margin-bottom: 1rem;
-}
-
-.search-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-
-.search-input {
-  flex: 1;
-  padding: 0.4rem 0.6rem;
-  border: 1px solid var(--border-color, #ccc);
-  border-radius: 4px;
-}
-
-.search-controls {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.search-counter {
-  font-size: 0.85rem;
-  margin-right: 0.5rem;
-  white-space: nowrap;
-}
-
-.search-nav-btn {
-  padding: 0.2rem 0.5rem;
-  font-size: 0.75rem;
-}
-
-mark.search-highlight {
-  background-color: #ffe066; /* Yellow for non-active matches */
-  color: #000;
-  border-radius: 2px;
-  padding: 0 1px;
-}
-
-mark.search-highlight.active {
-  background-color: #ff922b; /* Orange for the currently selected match */
-  color: #fff;
-}
-</style>

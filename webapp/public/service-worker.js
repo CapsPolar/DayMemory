@@ -1,9 +1,7 @@
 // DayMemory - Service Worker
 // Caches the app shell so it works fully offline once installed.
 
-const WORKER_ID = "a"
-
-const CACHE_NAME = 'daymemory-cache-v3';
+const CACHE_NAME = 'daymemory-cache-v4';
 
 const APP_SHELL = [
   '/',
@@ -34,30 +32,41 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-self.addEventListener('fetch', (event) => {
-  const requestUrl = new URL(event.request.url);
+function cacheResponse(request, response) {
+  if (!response || !response.ok || response.type !== 'basic') return;
+  const copy = response.clone();
+  caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+}
 
-  if (requestUrl.origin !== self.location.origin) {
+self.addEventListener('fetch', (event) => {
+  const { request } = event;
+  const url = new URL(request.url);
+
+  if (request.method !== 'GET' || url.origin !== self.location.origin) return;
+
+  // Pages: network first so a new deploy is picked up, cached shell when offline.
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          cacheResponse('/', response);
+          return response;
+        })
+        .catch(() => caches.match('/'))
+    );
     return;
   }
 
+  // Everything else: serve from cache instantly, refresh it in the background.
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) return cachedResponse;
-
-      return fetch(event.request)
-        .then((networkResponse) => {
-          const responseClone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseClone);
-          });
-          return networkResponse;
+    caches.match(request).then((cached) => {
+      const network = fetch(request)
+        .then((response) => {
+          cacheResponse(request, response);
+          return response;
         })
-        .catch(() => {
-          if (event.request.mode === 'navigate') {
-            return caches.match('/');
-          }
-        });
+        .catch(() => cached || Response.error());
+      return cached || network;
     })
   );
 });

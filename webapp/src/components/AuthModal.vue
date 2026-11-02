@@ -1,3 +1,4 @@
+<!-- AuthModal.vue -->
 <script setup lang="ts">
 import { computed } from "vue";
 
@@ -46,69 +47,58 @@ function updateBufferSection(index: number, text: string): void {
 </script>
 
 <template>
-  <div class="modal-overlay">
-    <div class="modal-content auth-modal-content">
-      <form v-if="mode === 'unlock'" @submit.prevent="emit('unlock')">
-        <h2>Unlock Vault</h2>
-        <p>Your continuous timeline remains zero-knowledge encrypted locally.</p>
-        <p v-if="firstTime" class="status-msg first-time-hint">
-          Set your vault password. You can always change it in settings.
-        </p>
-        <input
-          id="password-input"
-          :value="password"
-          type="password"
-          placeholder="Master Password"
-          required
-          autocomplete="off"
-          :disabled="unlocking"
-          @input="emit('update:password', ($event.target as HTMLInputElement).value)"
-        />
-        <button type="submit" :disabled="unlocking">
-          {{ unlocking ? "Unlocking..." : "Unlock" }}
-        </button>
-      </form>
+  <div class="app">
+    <header class="app-header">
+      <h1>Write</h1>
+      <span v-if="bufferSaveStatus" class="status">{{ bufferSaveStatus }}</span>
+    </header>
 
-      <section v-else>
-        <h2>Quick Buffer</h2>
-        <p>
-          Write freely without unlocking. Stored locally and unencrypted right
-          here until you unlock the vault — then it's merged into your
-          continuous timeline and cleared.
-        </p>
-        <div class="editor-card buffer-editor">
-          <label for="buffer-input" class="field-label">Quick Thoughts (Buffer):</label>
-          <div class="buffer-entries">
-            <div
-              v-for="(section, index) in bufferSections"
-              :key="index"
-              class="buffer-entry"
-            >
-              <textarea
-                v-if="section.timestamp"
-                :value="section.timestamp"
-                class="buffer-timestamp-textarea"
-                aria-label="Uneditable timestamp"
-                readonly
-                rows="1"
-              />
-              <textarea
-                :id="index === 0 ? 'buffer-input' : undefined"
-                :value="section.text"
-                :placeholder="index === 0 ? 'Jot something down...' : undefined"
-                class="buffer-textarea"
-                :aria-label="`Quick thoughts ${index + 1}`"
-                @input="updateBufferSection(index, ($event.target as HTMLTextAreaElement).value)"
-              />
-            </div>
-          </div>
-          <span class="status-msg" aria-live="polite">{{ bufferSaveStatus }}</span>
-        </div>
-      </section>
-
-      <button type="button" class="lock-view-toggle" @click="emit('toggleMode')">
-        {{ mode === "buffer" ? "🔑 Switch to Unlock" : "📝 Switch to Buffer" }}
+    <form v-if="mode === 'unlock'" class="view unlock" @submit.prevent="emit('unlock')">
+      <h2>Unlock vault</h2>
+      <p>Your writing is encrypted and added to your vault once you unlock it.</p>
+      <input
+        id="password-input"
+        :value="password"
+        type="password"
+        placeholder="Master password"
+        aria-label="Master password"
+        required
+        autocomplete="off"
+        :disabled="unlocking"
+        @input="emit('update:password', ($event.target as HTMLInputElement).value)"
+      />
+      <button type="submit" class="btn" :disabled="unlocking">
+        {{ unlocking ? "Unlocking…" : "Unlock" }}
       </button>
-    </div>
+      <button type="button" class="text-btn muted" @click="emit('toggleMode')">Cancel</button>
+    </form>
+
+    <main v-else class="view write">
+      <template v-for="(section, index) in bufferSections" :key="index">
+        <p v-if="section.timestamp" class="entry-time">{{ section.timestamp }}</p>
+        <textarea
+          :id="index === 0 ? 'buffer-input' : undefined"
+          :value="section.text"
+          :placeholder="index === 0 ? 'Start writing…' : undefined"
+          class="write-area"
+          :aria-label="`Writing section ${index + 1}`"
+          @input="updateBufferSection(index, ($event.target as HTMLTextAreaElement).value)"
+        />
+      </template>
+    </main>
+
+    <button
+      v-if="mode === 'buffer'"
+      type="button"
+      class="fab"
+      aria-label="Unlock Vault"
+      @click="emit('toggleMode')"
+    >
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="5" y="11" width="14" height="9" rx="2" />
+        <path d="M8 11V8a4 4 0 0 1 7.5-2" />
+      </svg>
+      Unlock Vault
+    </button>
   </div>
 </template>
