@@ -9,6 +9,7 @@ interface WritingSpaceSection {
 
 const props = defineProps<{
   firstTime: boolean;
+  firstTimeImportState?: string | null;
   mode: "writingSpace" | "unlock";
   password: string;
   writingSpaceText: string;
@@ -21,7 +22,37 @@ const emit = defineEmits<{
   "update:password": [value: string];
   "update:writingSpaceText": [value: string];
   toggleMode: [];
+  openFirstTimeImport: [];
 }>();
+
+const authTitle = computed(() => {
+  if (props.firstTimeImportState === "plain") return "Set password";
+  if (props.firstTimeImportState === "vault") return "Unlock vault";
+  return props.firstTime ? "Set password" : "Unlock vault";
+});
+
+const authHint = computed(() => {
+  if (props.firstTimeImportState === "plain") return "Import complete, now please set a password";
+  if (props.firstTimeImportState === "vault") return "Import complete, now enter the vault password";
+  return props.firstTime ? "You can always change it later." : "Your writing space is encrypted and added to your vault once you unlock it.";
+});
+
+const authPlaceholder = computed(() => {
+  if (props.firstTimeImportState === "plain") return "New password";
+  if (props.firstTimeImportState === "vault") return "Vault password";
+  return props.firstTime ? "New password" : "Master password";
+});
+
+const authButtonText = computed(() => {
+  if (props.unlocking) {
+    if (props.firstTimeImportState === "plain") return "Setting password…";
+    if (props.firstTimeImportState === "vault") return "Unlocking…";
+    return props.firstTime ? "Encrypting…" : "Unlocking…";
+  }
+  if (props.firstTimeImportState === "plain") return "Set password";
+  if (props.firstTimeImportState === "vault") return "Unlock vault";
+  return props.firstTime ? "Set password" : "Unlock";
+});
 
 const writingSpaceSections = computed<WritingSpaceSection[]>(() => {
   const parts = props.writingSpaceText.split(/(\[TIME\s+[^\]]+\]:)/g);
@@ -57,30 +88,32 @@ function updateWritingSpaceSection(index: number, typed: string): void {
       <span v-if="writingSpaceSaveStatus" class="status">{{ writingSpaceSaveStatus }}</span>
     </header>
 
-    <form v-if="mode === 'unlock'" class="view unlock" @submit.prevent="emit('unlock')">
-      <h2>{{ firstTime ? "Set password" : "Unlock vault" }}</h2>
-      <p>
-        {{
-          firstTime
-            ? "You can always change it later."
-            : "Your writing space is encrypted and added to your vault once you unlock it."
-        }}
-      </p>
+    <form v-if="mode === 'unlock' || firstTimeImportState" class="view unlock" @submit.prevent="emit('unlock')">
+      <h2>{{ authTitle }}</h2>
+      <p>{{ authHint }}</p>
       <input
         id="password-input"
         :value="password"
         type="password"
-        :placeholder="firstTime ? 'New password' : 'Master password'"
-        :aria-label="firstTime ? 'New password' : 'Master password'"
+        :placeholder="authPlaceholder"
+        :aria-label="authPlaceholder"
         required
         autocomplete="off"
         :disabled="unlocking"
         @input="emit('update:password', ($event.target as HTMLInputElement).value)"
       />
       <button type="submit" class="btn" :disabled="unlocking">
-        {{ unlocking ? (firstTime ? "Encrypting…" : "Unlocking…") : firstTime ? "Set password" : "Unlock" }}
+        {{ authButtonText }}
       </button>
-      <button type="button" class="text-btn muted" @click="emit('toggleMode')">Cancel</button>
+      <button
+        v-if="firstTime && !firstTimeImportState"
+        type="button"
+        class="text-btn muted"
+        @click="emit('openFirstTimeImport')"
+      >
+        Looking to restore your vault? Import vault
+      </button>
+      <button v-if="!firstTimeImportState" type="button" class="text-btn muted" @click="emit('toggleMode')">Cancel</button>
     </form>
 
     <main v-else class="view write">
@@ -98,7 +131,7 @@ function updateWritingSpaceSection(index: number, typed: string): void {
     </main>
 
     <button
-      v-if="mode === 'writingSpace'"
+      v-if="mode === 'writingSpace' && !firstTimeImportState"
       type="button"
       class="fab"
       :aria-label="firstTime ? 'Encrypt writing space' : 'Unlock Vault'"

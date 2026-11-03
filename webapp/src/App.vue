@@ -8,6 +8,7 @@ import { CryptoJSAdapter } from "../adapters/CryptoJSAdapter";
 import { IndexedDBAdapter } from "../adapters/IndexedDBAdapter";
 import AuthModal from "./components/AuthModal.vue";
 import MainApp from "./components/MainApp.vue";
+import SettingsView from "./components/SettingsView.vue";
 
 function hasRealWritingSpaceContent(stored: string): boolean {
   return stored.replace(/\[TIME [^\]]*\]:/g, "").trim().length > 0;
@@ -17,6 +18,9 @@ const isUnlocked = ref(false);
 const initialized = ref(false);
 const storageError = ref("");
 const firstTime = ref(false);
+const isFirstTimeImportView = ref(false);
+const firstTimeImportState = ref<string | null>(null);
+
 const mode = ref<"writingSpace" | "unlock">("writingSpace");
 const password = ref("");
 const unlocking = ref(false);
@@ -38,6 +42,8 @@ const passwordStatus = ref("");
 
 let vaultService: VaultService | null = null;
 let writingSpaceService: BufferService | null = null;
+let storageInstance: IndexedDBAdapter | null = null;
+
 let writingSpaceAutosaveTimeout: ReturnType<typeof setTimeout> | null = null;
 let writingSpaceStatusTimeout: ReturnType<typeof setTimeout> | null = null;
 let passwordReloadTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -66,11 +72,18 @@ function describeError(error: unknown): string {
 
 async function initialize(): Promise<void> {
   const storage = new IndexedDBAdapter();
+  storageInstance = storage;
   try {
     await storage.open();
     vaultService = new VaultService(storage, new CryptoJSAdapter());
     writingSpaceService = new BufferService(storage);
-    firstTime.value = !(await vaultService.hasVault());
+
+    const storedImportState = await storage.getItem("firsttimeimport");
+    if (storedImportState) {
+      firstTimeImportState.value = storedImportState;
+    }
+
+    firstTime.value = !(await vaultService.hasVault()) && !storedImportState;
 
     const storedWritingSpace = await writingSpaceService.getBuffer();
     const initialText = withFreshTimestamp(storedWritingSpace);
@@ -127,6 +140,94 @@ async function unlock(): Promise<void> {
   content.value = vaultService.getContent();
 
   if (merged) showToast("Your writing space was added to the vault.");
+}
+
+async function handleAuth(): Promise<void> {
+  if (firstTimeImportState.value) {
+    const enteredPassword = password.value.trim();
+    if (!enteredPassword || unlocking.value || !vaultService || !storageInstance) return;
+
+    unlocking.value = true;
+    try {
+      if (firstTimeImportState.value === "plain") {
+        const success = await vaultService.changePassword("temp-dummy-password-for-import", enteredPassword);
+        if (!success) {
+          showToast("Failed to set new password.");
+          unlocking.value = false;
+          return;
+        }
+      } else if (firstTimeImportState.value === "vault") {
+        const success = await vaultService.unlock(enteredPassword);
+        if (!success) {
+          password.value = "";
+          showToast("Incorrect password.");
+          unlocking.value = false;
+          return;
+        }
+      }
+
+      await storageInstance.removeItem("firsttimeimport");
+      firstTimeImportState.value = null;
+
+      isUnlocked.value = true;
+      content.value = vaultService.getContent();
+      showToast("Vault successfully authenticated and unlocked.");
+    } catch (error) {
+      console.error(error);
+      showToast(`Authentication failed (${describeError(error)}).`);
+    } finally {
+      unlocking.value = false;
+    }
+  } else {
+    await unlock();
+  }
+}
+
+function openFirstTimeImport(): void {
+  isFirstTimeImportView.value = true;
+  backupVisible.value = false;
+  changePasswordVisible.value = false;
+  backupText.value = "";
+  backupStatus.value = "";
+}
+
+async function submitFirstTimeImportBackup(): Promise<void> {
+  const raw = backupText.value.trim();
+  if (!raw) return;
+
+  const isUnencryptedImport = backupMode.value === "unencrypted-import";
+  const importType = isUnencryptedImport ? "plain" : "vault";
+
+  const confirmMsg = isUnencryptedImport
+    ? "This will overwrite your current vault content with the imported plain history text content, and securely re-encrypt it. Proceed?"
+    : "This will overwrite your current vault with the imported encrypted vault string. Proceed?";
+
+  if (!window.confirm(confirmMsg)) {
+    return;
+  }
+
+  try {
+    if (!vaultService || !storageInstance) throw new Error("Vault service is not initialized.");
+
+    const dummyPassword = "temp-dummy-password-for-import";
+    await vaultService.unlock(dummyPassword);
+
+    if (isUnencryptedImport) {
+      await vaultService.saveContent(raw);
+    } else {
+      await vaultService.importRaw(raw);
+    }
+
+    await storageInstance.setItem("firsttimeimport", importType);
+    firstTimeImportState.value = importType;
+    firstTime.value = false;
+
+    isFirstTimeImportView.value = false;
+    showToast("Import complete. Please authenticate.");
+  } catch (error) {
+    console.error(error);
+    backupStatus.value = "Couldn't write the import data to storage. Nothing was changed.";
+  }
 }
 
 async function updateVaultContent(newContent: string): Promise<void> {
@@ -360,19 +461,53 @@ onBeforeUnmount(() => {
   <main v-else-if="!initialized" class="splash">
     <h2>Opening DayMemory…</h2>
   </main>
+  <template v-else-if="isFirstTimeImportView">
+    <div class="app">
+      <header class="app-header">
+        <h1>Import vault</h1>
+      </header>
+
+      <main class="view">
+        <SettingsView
+          :backup-visible="backupVisible"
+          :change-password-visible="changePasswordVisible"
+          :backup-mode="backupMode"
+          :backup-text="backupText"
+          :backup-status="backupStatus"
+          :old-password="oldPassword"
+          :new-password="newPassword"
+          :password-confirmation="passwordConfirmation"
+          :password-status="passwordStatus"
+          :is-first-time-import="true"
+          @open-export="openExport"
+          @open-import="openImport"
+          @toggle-password-panel="togglePasswordPanel"
+          @submit-backup="submitFirstTimeImportBackup"
+          @file-import-upload="handleFileImportUpload"
+          @submit-password="submitPasswordChange"
+          @update:backup-text="backupText = $event"
+          @update:old-password="oldPassword = $event"
+          @update:new-password="newPassword = $event"
+          @update:password-confirmation="passwordConfirmation = $event"
+        />
+      </main>
+    </div>
+  </template>
   <template v-else>
     <AuthModal
       v-if="!isUnlocked"
       :first-time="firstTime"
+      :first-time-import-state="firstTimeImportState"
       :mode="mode"
       :password="password"
       :writing-space-text="writingSpaceText"
       :writing-space-save-status="writingSpaceSaveStatus"
       :unlocking="unlocking"
-      @unlock="unlock"
+      @unlock="handleAuth"
       @update:password="password = $event"
       @update:writing-space-text="updateWritingSpace"
       @toggle-mode="mode = mode === 'writingSpace' ? 'unlock' : 'writingSpace'"
+      @open-first-time-import="openFirstTimeImport"
     />
     <MainApp
       v-else

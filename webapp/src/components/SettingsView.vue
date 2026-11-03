@@ -13,6 +13,7 @@ const props = defineProps<{
   newPassword: string;
   passwordConfirmation: string;
   passwordStatus: string;
+  isFirstTimeImport?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -70,7 +71,7 @@ function triggerFileInput(): void {
 </script>
 
 <template>
-  <div class="list-row">
+  <div v-if="!isFirstTimeImport" class="list-row">
     Theme
     <div class="segmented" role="group" aria-label="Theme">
       <button
@@ -85,14 +86,14 @@ function triggerFileInput(): void {
       </button>
     </div>
   </div>
-  <button class="list-row" @click="emit('openExport', 'encrypted')">Export encrypted vault string</button>
-  <button class="list-row" @click="emit('openExport', 'unencrypted')">
+  <button v-if="!isFirstTimeImport" class="list-row" @click="emit('openExport', 'encrypted')">Export encrypted vault string</button>
+  <button v-if="!isFirstTimeImport" class="list-row" @click="emit('openExport', 'unencrypted')">
     Export unencrypted plain history text
     <span class="row-note">Not recommended</span>
   </button>
   <button class="list-row" @click="emit('openImport', 'encrypted')">Import encrypted vault string</button>
   <button class="list-row" @click="emit('openImport', 'unencrypted')">Import unencrypted plain history text</button>
-  <button class="list-row" @click="emit('togglePasswordPanel')">Change password</button>
+  <button v-if="!isFirstTimeImport" class="list-row" @click="emit('togglePasswordPanel')">Change password</button>
 
   <div v-if="backupVisible" class="panel">
     <p class="hint">
@@ -112,7 +113,6 @@ function triggerFileInput(): void {
     />
 
     <template v-if="!isImport">
-      <!-- <button class="btn" @click="emit('submitBackup', 'clipboard')">Copy to clipboard</button> -->
       <button class="btn" @click="emit('submitBackup', 'file')">Download as .txt</button>
     </template>
     <button v-else class="btn danger" @click="emit('submitBackup', 'restore')">Restore backup (overwrite)</button>
