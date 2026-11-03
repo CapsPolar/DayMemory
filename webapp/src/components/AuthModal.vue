@@ -34,7 +34,7 @@ const authTitle = computed(() => {
 const authHint = computed(() => {
   if (props.importing === "plain") return "Import complete, now please set a password";
   if (props.importing === "vault") return "Import complete, now enter the vault password";
-  return props.firstTime ? "You can always change it later." : "Your writing space is encrypted and added to your vault once you unlock it.";
+  return props.firstTime ? "You can always change it later." : "Your writings are encrypted and added to your vault once you unlock it.";
 });
 
 const authPlaceholder = computed(() => {

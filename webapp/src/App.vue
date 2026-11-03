@@ -139,7 +139,7 @@ async function unlock(): Promise<void> {
   isUnlocked.value = true;
   content.value = vaultService.getContent();
 
-  if (merged) showToast("Your writing space was added to the vault.");
+  if (merged) showToast("Your writings were added to the vault");
 }
 
 async function handleAuth(): Promise<void> {
@@ -270,7 +270,7 @@ function navigate(view: "thoughts" | "settings"): void {
 async function openExport(type: "encrypted" | "unencrypted"): Promise<void> {
   if (type === "unencrypted") {
     const confirmUnencrypted = window.confirm(
-      "Never use plain export for backup, backup the encrypted string instead - you can always unlock it as long as you have the password. Exporting plain text isn't secure unless you really want to move to another app."
+      "Skip plain text exports—they aren't secure. Only use them if you are migrating your history to another app. For regular backups, export the encrypted string, which you can unlock anytime with your password."
     );
     if (!confirmUnencrypted) return;
   }
