@@ -319,8 +319,27 @@ function openImport(type: "encrypted" | "unencrypted"): void {
   backupStatus.value = "";
 }
 
+interface SaveFilePickerOptions {
+  suggestedName: string;
+  types: {
+    description: string;
+    accept: Record<string, string[]>;
+  }[];
+}
+
+interface SaveFileHandle {
+  createWritable(): Promise<{
+    write(data: string): Promise<void>;
+    close(): Promise<void>;
+  }>;
+}
+
 async function downloadFile(filename: string, text: string): Promise<void> {
-  if ('showSaveFilePicker' in window) {
+  const filePickerWindow = window as Window & {
+    showSaveFilePicker?: (options: SaveFilePickerOptions) => Promise<SaveFileHandle>;
+  };
+
+  if (typeof filePickerWindow.showSaveFilePicker === "function") {
     try {
       const options: SaveFilePickerOptions = {
         suggestedName: filename,
@@ -334,7 +353,7 @@ async function downloadFile(filename: string, text: string): Promise<void> {
         ],
       };
       
-      const handle = await window.showSaveFilePicker(options);
+      const handle = await filePickerWindow.showSaveFilePicker(options);
       const writable = await handle.createWritable();
       await writable.write(text);
       await writable.close();
