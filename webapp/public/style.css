@@ -500,3 +500,93 @@ mark.search-highlight.active {
     opacity: 0;
     transform: translate(-50%, -8px);
 }
+
+/* Edit sheet backdrop overlay */
+.sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(2px);
+    opacity: 1;
+    transition: opacity 0.25s ease;
+}
+
+/* Edit bottom sheet */
+.sheet {
+    position: relative;
+    z-index: 51;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 80vh;
+    height: 80dvh;
+    background: var(--bg);
+    border-top-left-radius: 20px;
+    border-top-right-radius: 20px;
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+    transform: translateY(0);
+    transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.sheet .app-header {
+    border-top-left-radius: 20px;
+    border-top-right-radius: 20px;
+    height: 56px;
+    padding: 0 var(--gutter);
+}
+
+.sheet .entry-time {
+    padding: 12px var(--gutter) 4px;
+}
+
+.sheet textarea {
+    flex: 1;
+    width: 100%;
+    padding: 8px var(--gutter);
+    background: transparent;
+    border: 0;
+    outline: none;
+    resize: none;
+    line-height: 1.6;
+}
+
+/* Sheet Footer Action Bar */
+.sheet-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px var(--gutter) calc(12px + var(--bottom));
+    background: var(--bg);
+    border-top: 1px solid var(--line);
+}
+
+.sheet-actions .btn {
+    flex: 1;
+    height: 44px;
+}
+
+/* Vue Transition for Bottom Sheet */
+.sheet-slide-enter-from .sheet,
+.sheet-slide-leave-to .sheet {
+    transform: translateY(100%);
+}
+
+.sheet-slide-enter-from,
+.sheet-slide-leave-to {
+    opacity: 0;
+}
+
+.sheet-slide-enter-active,
+.sheet-slide-leave-active {
+    transition: opacity 0.25s ease;
+}
+
+.sheet-slide-enter-active .sheet,
+.sheet-slide-leave-active .sheet {
+    transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+}

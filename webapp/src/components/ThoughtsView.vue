@@ -211,7 +211,6 @@ function scrollToActiveMatch(): void {
   });
 }
 
-// Helper to check if a specific slice of text is the active match
 function isMatchActive(sectionId: string, type: "timestamp" | "text", startIndex: number, length: number): boolean {
   const currentMatch = allMatches.value[activeMatchIndex.value];
   if (!currentMatch) return false;
@@ -293,9 +292,7 @@ function saveSection(section: HistorySection): void {
   const newContent = updatedSections.map(s => s.fullText).join("");
 
   emit("update:content", newContent);
-  editingSectionId.value = null;
-  editTimestamp.value = "";
-  editText.value = "";
+  cancelEditing();
 }
 </script>
 
@@ -369,16 +366,30 @@ function saveSection(section: HistorySection): void {
   </article>
 
   <Teleport to="body">
-    <div v-if="editingSectionId" class="sheet">
-      <header class="app-header">
-        <button type="button" class="text-btn muted" @click="cancelEditing">Cancel</button>
-        <h1>Edit entry</h1>
-        <button type="button" class="text-btn" @click="editingSection && saveSection(editingSection)">
-          Save
-        </button>
-      </header>
-      <p v-if="editTimestamp" class="entry-time">{{ editTimestamp }}</p>
-      <textarea v-model="editText" aria-label="Entry content" />
-    </div>
+    <Transition name="sheet-slide">
+      <div v-if="editingSectionId" class="sheet-backdrop" @click.self="cancelEditing">
+        <div class="sheet">
+          <header class="app-header">
+            <h1>Edit entry</h1>
+          </header>
+
+          <p v-if="editTimestamp" class="entry-time">{{ editTimestamp }}</p>
+          <textarea v-model="editText" aria-label="Entry content" />
+
+          <footer class="sheet-actions">
+            <button type="button" class="btn secondary" @click="cancelEditing">
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="btn"
+              @click="editingSection && saveSection(editingSection)"
+            >
+              Save
+            </button>
+          </footer>
+        </div>
+      </div>
+    </Transition>
   </Teleport>
 </template>
