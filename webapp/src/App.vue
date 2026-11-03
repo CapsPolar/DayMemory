@@ -319,7 +319,36 @@ function openImport(type: "encrypted" | "unencrypted"): void {
   backupStatus.value = "";
 }
 
-function downloadFile(filename: string, text: string): void {
+async function downloadFile(filename: string, text: string): Promise<void> {
+  if ('showSaveFilePicker' in window) {
+    try {
+      const options: SaveFilePickerOptions = {
+        suggestedName: filename,
+        types: [
+          {
+            description: 'Text Files',
+            accept: {
+              'text/plain': ['.txt'],
+            },
+          },
+        ],
+      };
+      
+      const handle = await window.showSaveFilePicker(options);
+      const writable = await handle.createWritable();
+      await writable.write(text);
+      await writable.close();
+      
+      backupStatus.value = `File saved successfully.`;
+      return;
+    } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return;
+      }
+      console.warn('File System Access API failed, falling back to legacy download:', error);
+    }
+  }
+
   const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -329,6 +358,7 @@ function downloadFile(filename: string, text: string): void {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+  backupStatus.value = `Download started.`;
 }
 
 function handleFileImportUpload(event: Event): void {
@@ -368,8 +398,7 @@ async function submitBackup(actionType: "clipboard" | "file" | "restore"): Promi
       }
     } else {
       try {
-        downloadFile(filename, backupText.value);
-        backupStatus.value = `${label} downloaded.`;
+        await downloadFile(filename, backupText.value);
       } catch (error) {
         console.error(error);
         backupStatus.value = "Couldn't start the file download.";
@@ -394,7 +423,6 @@ async function submitBackup(actionType: "clipboard" | "file" | "restore"): Promi
     if (!vaultService || !storageInstance) throw new Error("Vault service is not initialized.");
     if (isUnencryptedImport) {
       await vaultService.saveContent(raw);
-      // await storageInstance.setItem("importing", "plain");
     } else {
       await vaultService.importRaw(raw);
       await storageInstance.setItem("importing", "vault");
