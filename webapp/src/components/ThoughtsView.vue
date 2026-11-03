@@ -1,6 +1,6 @@
 <!-- ThoughtsView.vue -->
 <script setup lang="ts">
-import { computed, ref, watch, nextTick } from "vue";
+import { computed, ref, watch, nextTick, onMounted } from "vue";
 
 const props = defineProps<{
   content: string;
@@ -34,6 +34,27 @@ const editText = ref("");
 // Search State
 const searchQuery = ref("");
 const activeMatchIndex = ref(0);
+
+function scrollToBottom(): void {
+  nextTick(() => {
+    const container = document.querySelector(".view") || window;
+    if (container instanceof HTMLElement) {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: "smooth"
+      });
+    } else {
+      window.scrollTo({
+        top: document.documentElement.scrollHeight,
+        behavior: "smooth"
+      });
+    }
+  });
+}
+
+onMounted(() => {
+  scrollToBottom();
+});
 
 function splitIntoSections(text: string): string[] {
   if (!text) return [""];
