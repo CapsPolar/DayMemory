@@ -30,20 +30,20 @@ const emit = defineEmits<{
 
 const modeInfo = {
   "encrypted-export": {
-    title: "Encrypted export",
-    hint: "Your vault stays protected by your master password."
+    title: "Export encrypted vault string",
+    hint: "Your vault string stays protected by your master password."
   },
   "unencrypted-export": {
-    title: "Unencrypted export",
-    hint: "Anyone with this text can read your entries."
+    title: "Export unencrypted plain history text",
+    hint: "Anyone with this plain history text can read your entries."
   },
   "encrypted-import": {
-    title: "Encrypted import",
-    hint: "Choose a backup file or paste the encrypted text to restore your vault."
+    title: "Import encrypted vault string",
+    hint: "Choose a backup file or paste your encrypted vault string to restore."
   },
   "unencrypted-import": {
-    title: "Unencrypted import",
-    hint: "Choose a text file or paste text. It replaces your vault and is re-encrypted with your current password."
+    title: "Import unencrypted plain history text",
+    hint: "Choose a text file or paste plain history text. It replaces your vault and is re-encrypted with your current password."
   }
 } as const;
 
@@ -85,13 +85,13 @@ function triggerFileInput(): void {
       </button>
     </div>
   </div>
-  <button class="list-row" @click="emit('openExport', 'encrypted')">Export vault (encrypted)</button>
+  <button class="list-row" @click="emit('openExport', 'encrypted')">Export encrypted vault string</button>
   <button class="list-row" @click="emit('openExport', 'unencrypted')">
-    Export vault (unencrypted)
+    Export unencrypted plain history text
     <span class="row-note">Not recommended</span>
   </button>
-  <button class="list-row" @click="emit('openImport', 'encrypted')">Import vault (encrypted)</button>
-  <button class="list-row" @click="emit('openImport', 'unencrypted')">Import vault (unencrypted)</button>
+  <button class="list-row" @click="emit('openImport', 'encrypted')">Import encrypted vault string</button>
+  <button class="list-row" @click="emit('openImport', 'unencrypted')">Import unencrypted plain history text</button>
   <button class="list-row" @click="emit('togglePasswordPanel')">Change password</button>
 
   <div v-if="backupVisible" class="panel">
@@ -106,14 +106,14 @@ function triggerFileInput(): void {
     <textarea
       :value="backupText"
       :readonly="!isImport"
-      :placeholder="isImport ? 'Paste text here or choose a file' : 'Vault export'"
+      :placeholder="isImport ? 'Paste content here or choose a file' : 'Vault data'"
       class="backup-area"
       @input="emit('update:backupText', ($event.target as HTMLTextAreaElement).value)"
     />
 
     <template v-if="!isImport">
-      <button class="btn" @click="emit('submitBackup', 'clipboard')">Copy to clipboard</button>
-      <button class="btn secondary" @click="emit('submitBackup', 'file')">Download as .txt</button>
+      <!-- <button class="btn" @click="emit('submitBackup', 'clipboard')">Copy to clipboard</button> -->
+      <button class="btn" @click="emit('submitBackup', 'file')">Download as .txt</button>
     </template>
     <button v-else class="btn danger" @click="emit('submitBackup', 'restore')">Restore backup (overwrite)</button>
 

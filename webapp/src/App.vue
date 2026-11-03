@@ -9,7 +9,7 @@ import { IndexedDBAdapter } from "../adapters/IndexedDBAdapter";
 import AuthModal from "./components/AuthModal.vue";
 import MainApp from "./components/MainApp.vue";
 
-function hasRealBufferContent(stored: string): boolean {
+function hasRealWritingSpaceContent(stored: string): boolean {
   return stored.replace(/\[TIME [^\]]*\]:/g, "").trim().length > 0;
 }
 
@@ -17,11 +17,11 @@ const isUnlocked = ref(false);
 const initialized = ref(false);
 const storageError = ref("");
 const firstTime = ref(false);
-const mode = ref<"buffer" | "unlock">("buffer");
+const mode = ref<"writingSpace" | "unlock">("writingSpace");
 const password = ref("");
 const unlocking = ref(false);
-const bufferText = ref("");
-const bufferSaveStatus = ref("");
+const writingSpaceText = ref("");
+const writingSpaceSaveStatus = ref("");
 const content = ref("");
 const activeView = ref<"thoughts" | "settings">("thoughts");
 const toast = ref("");
@@ -37,9 +37,9 @@ const passwordConfirmation = ref("");
 const passwordStatus = ref("");
 
 let vaultService: VaultService | null = null;
-let bufferService: BufferService | null = null;
-let bufferAutosaveTimeout: ReturnType<typeof setTimeout> | null = null;
-let bufferStatusTimeout: ReturnType<typeof setTimeout> | null = null;
+let writingSpaceService: BufferService | null = null;
+let writingSpaceAutosaveTimeout: ReturnType<typeof setTimeout> | null = null;
+let writingSpaceStatusTimeout: ReturnType<typeof setTimeout> | null = null;
 let passwordReloadTimeout: ReturnType<typeof setTimeout> | null = null;
 let toastTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -54,10 +54,10 @@ function showToast(message: string): void {
   toastTimeout = setTimeout(() => (toast.value = ""), 3000);
 }
 
-function showSavedStatus(target: typeof bufferSaveStatus): void {
+function showSavedStatus(target: typeof writingSpaceSaveStatus): void {
   target.value = "Saved";
-  bufferStatusTimeout = clearTimer(bufferStatusTimeout);
-  bufferStatusTimeout = setTimeout(() => (target.value = ""), 1500);
+  writingSpaceStatusTimeout = clearTimer(writingSpaceStatusTimeout);
+  writingSpaceStatusTimeout = setTimeout(() => (target.value = ""), 1500);
 }
 
 function describeError(error: unknown): string {
@@ -69,13 +69,13 @@ async function initialize(): Promise<void> {
   try {
     await storage.open();
     vaultService = new VaultService(storage, new CryptoJSAdapter());
-    bufferService = new BufferService(storage);
+    writingSpaceService = new BufferService(storage);
     firstTime.value = !(await vaultService.hasVault());
 
-    const storedBuffer = await bufferService.getBuffer();
-    const initialText = withFreshTimestamp(storedBuffer);
-    bufferText.value = initialText;
-    await bufferService.saveBuffer(initialText);
+    const storedWritingSpace = await writingSpaceService.getBuffer();
+    const initialText = withFreshTimestamp(storedWritingSpace);
+    writingSpaceText.value = initialText;
+    await writingSpaceService.saveBuffer(initialText);
   } catch (error) {
     console.error(error);
     storageError.value = `DayMemory couldn't access its local IndexedDB storage (${describeError(error)}). Check that site data is available and try again. Private/incognito mode or blocked site data can cause this.`;
@@ -84,17 +84,17 @@ async function initialize(): Promise<void> {
   }
 }
 
-async function mergeBufferIntoVault(): Promise<boolean> {
-  if (!bufferService || !vaultService) throw new Error("Vault services are not initialized.");
+async function mergeWritingSpaceIntoVault(): Promise<boolean> {
+  if (!writingSpaceService || !vaultService) throw new Error("Vault services are not initialized.");
 
-  const pending = await bufferService.getBuffer();
-  if (!hasRealBufferContent(pending)) {
-    if (pending) await bufferService.clear();
+  const pending = await writingSpaceService.getBuffer();
+  if (!hasRealWritingSpaceContent(pending)) {
+    if (pending) await writingSpaceService.clear();
     return false;
   }
 
   await vaultService.appendContent(pending);
-  await bufferService.clear();
+  await writingSpaceService.clear();
   return true;
 }
 
@@ -107,7 +107,7 @@ async function unlock(): Promise<void> {
   let merged = false;
   try {
     success = await vaultService.unlock(enteredPassword);
-    if (success) merged = await mergeBufferIntoVault();
+    if (success) merged = await mergeWritingSpaceIntoVault();
   } catch (error) {
     console.error(error);
     vaultService.lock();
@@ -126,7 +126,7 @@ async function unlock(): Promise<void> {
   isUnlocked.value = true;
   content.value = vaultService.getContent();
 
-  if (merged) showToast("Your writing was added to the vault.");
+  if (merged) showToast("Your writing space was added to the vault.");
 }
 
 async function updateVaultContent(newContent: string): Promise<void> {
@@ -140,22 +140,22 @@ async function updateVaultContent(newContent: string): Promise<void> {
   }
 }
 
-function updateBuffer(value: string): void {
-  bufferText.value = value;
-  bufferAutosaveTimeout = clearTimer(bufferAutosaveTimeout);
-  bufferAutosaveTimeout = setTimeout(() => void saveCurrentBuffer(), 500);
+function updateWritingSpace(value: string): void {
+  writingSpaceText.value = value;
+  writingSpaceAutosaveTimeout = clearTimer(writingSpaceAutosaveTimeout);
+  writingSpaceAutosaveTimeout = setTimeout(() => void saveCurrentWritingSpace(), 500);
 }
 
-async function saveCurrentBuffer(): Promise<void> {
-  if (!bufferService) return;
+async function saveCurrentWritingSpace(): Promise<void> {
+  if (!writingSpaceService) return;
   try {
-    await bufferService.saveBuffer(bufferText.value);
+    await writingSpaceService.saveBuffer(writingSpaceText.value);
   } catch (error) {
     console.error(error);
-    bufferSaveStatus.value = "Save failed";
+    writingSpaceSaveStatus.value = "Save failed";
     return;
   }
-  showSavedStatus(bufferSaveStatus);
+  showSavedStatus(writingSpaceSaveStatus);
 }
 
 function navigate(view: "thoughts" | "settings"): void {
@@ -167,6 +167,13 @@ function navigate(view: "thoughts" | "settings"): void {
 }
 
 async function openExport(type: "encrypted" | "unencrypted"): Promise<void> {
+  if (type === "unencrypted") {
+    const confirmUnencrypted = window.confirm(
+      "Never use plain export for backup, backup the encrypted string instead - you can always unlock it as long as you have the password. Exporting plain text isn't secure unless you really want to move to another app."
+    );
+    if (!confirmUnencrypted) return;
+  }
+
   backupMode.value = type === "encrypted" ? "encrypted-export" : "unencrypted-export";
   changePasswordVisible.value = false;
   backupVisible.value = true;
@@ -222,15 +229,15 @@ function handleFileImportUpload(event: Event): void {
     backupStatus.value = "Failed to read the selected file.";
   };
   reader.readAsText(file);
-  target.value = ""; // Reset input so the same file can be selected again if needed
+  target.value = "";
 }
 
 async function submitBackup(actionType: "clipboard" | "file" | "restore"): Promise<void> {
   if (backupMode.value === "encrypted-export" || backupMode.value === "unencrypted-export") {
     if (!backupText.value) return;
     const isEncrypted = backupMode.value === "encrypted-export";
-    const label = isEncrypted ? "Encrypted vault string" : "Unencrypted vault content";
-    const filename = isEncrypted ? "daymemory-vault-encrypted.txt" : "daymemory-vault-unencrypted.txt";
+    const label = isEncrypted ? "Encrypted vault string" : "Unencrypted plain history text";
+    const filename = isEncrypted ? "daymemory-vault-encrypted.txt" : "daymemory-plain-history.txt";
 
     if (actionType === "clipboard") {
       try {
@@ -257,8 +264,8 @@ async function submitBackup(actionType: "clipboard" | "file" | "restore"): Promi
 
   const isUnencryptedImport = backupMode.value === "unencrypted-import";
   const confirmMsg = isUnencryptedImport
-    ? "This will overwrite your current vault content with the imported text, and securely re-encrypt it using your active master password. Proceed?"
-    : "This will overwrite all current system entries with your encrypted backup text. Proceed?";
+    ? "This will overwrite your current vault content with the imported plain history text content, and securely re-encrypt it using your active master password. Proceed?"
+    : "This will overwrite your current vault with the imported encrypted vault string. And you'll need to provide password of the imported vault to unlock it. Proceed?";
 
   if (!window.confirm(confirmMsg)) {
     return;
@@ -329,7 +336,7 @@ function lockVault(): Promise<void> {
   vaultService?.lock();
   content.value = "";
   isUnlocked.value = false;
-  mode.value = "buffer";
+  mode.value = "writingSpace";
   password.value = "";
   return Promise.resolve();
 }
@@ -337,8 +344,8 @@ function lockVault(): Promise<void> {
 onMounted(() => void initialize());
 
 onBeforeUnmount(() => {
-  bufferAutosaveTimeout = clearTimer(bufferAutosaveTimeout);
-  bufferStatusTimeout = clearTimer(bufferStatusTimeout);
+  writingSpaceAutosaveTimeout = clearTimer(writingSpaceAutosaveTimeout);
+  writingSpaceStatusTimeout = clearTimer(writingSpaceStatusTimeout);
   passwordReloadTimeout = clearTimer(passwordReloadTimeout);
   toastTimeout = clearTimer(toastTimeout);
   vaultService?.lock();
@@ -359,13 +366,13 @@ onBeforeUnmount(() => {
       :first-time="firstTime"
       :mode="mode"
       :password="password"
-      :buffer-text="bufferText"
-      :buffer-save-status="bufferSaveStatus"
+      :writing-space-text="writingSpaceText"
+      :writing-space-save-status="writingSpaceSaveStatus"
       :unlocking="unlocking"
       @unlock="unlock"
       @update:password="password = $event"
-      @update:buffer-text="updateBuffer"
-      @toggle-mode="mode = mode === 'buffer' ? 'unlock' : 'buffer'"
+      @update:writing-space-text="updateWritingSpace"
+      @toggle-mode="mode = mode === 'writingSpace' ? 'unlock' : 'writingSpace'"
     />
     <MainApp
       v-else

@@ -2,32 +2,32 @@
 <script setup lang="ts">
 import { computed } from "vue";
 
-interface BufferSection {
+interface WritingSpaceSection {
   timestamp: string;
   text: string;
 }
 
 const props = defineProps<{
   firstTime: boolean;
-  mode: "buffer" | "unlock";
+  mode: "writingSpace" | "unlock";
   password: string;
-  bufferText: string;
-  bufferSaveStatus: string;
+  writingSpaceText: string;
+  writingSpaceSaveStatus: string;
   unlocking: boolean;
 }>();
 
 const emit = defineEmits<{
   unlock: [];
   "update:password": [value: string];
-  "update:bufferText": [value: string];
+  "update:writingSpaceText": [value: string];
   toggleMode: [];
 }>();
 
-const bufferSections = computed<BufferSection[]>(() => {
-  const parts = props.bufferText.split(/(\[TIME\s+[^\]]+\]:)/g);
+const writingSpaceSections = computed<WritingSpaceSection[]>(() => {
+  const parts = props.writingSpaceText.split(/(\[TIME\s+[^\]]+\]:)/g);
   if (parts.length === 1) return [{ timestamp: "", text: parts[0] }];
 
-  const sections: BufferSection[] = [];
+  const sections: WritingSpaceSection[] = [];
   if (parts[0]) sections.push({ timestamp: "", text: parts[0] });
   for (let i = 1; i < parts.length; i += 2) {
     sections.push({ timestamp: parts[i], text: parts[i + 1] || "" });
@@ -39,12 +39,12 @@ function leadingSpace(text: string): string {
   return text.match(/^\s*/)?.[0] ?? "";
 }
 
-function updateBufferSection(index: number, typed: string): void {
-  const updatedSections = bufferSections.value.map((section, sectionIndex) =>
+function updateWritingSpaceSection(index: number, typed: string): void {
+  const updatedSections = writingSpaceSections.value.map((section, sectionIndex) =>
     sectionIndex === index ? { ...section, text: leadingSpace(section.text) + typed } : section
   );
   emit(
-    "update:bufferText",
+    "update:writingSpaceText",
     updatedSections.map(section => section.timestamp + section.text).join("")
   );
 }
@@ -53,8 +53,8 @@ function updateBufferSection(index: number, typed: string): void {
 <template>
   <div class="app">
     <header class="app-header">
-      <h1>Write</h1>
-      <span v-if="bufferSaveStatus" class="status">{{ bufferSaveStatus }}</span>
+      <h1>Writing space</h1>
+      <span v-if="writingSpaceSaveStatus" class="status">{{ writingSpaceSaveStatus }}</span>
     </header>
 
     <form v-if="mode === 'unlock'" class="view unlock" @submit.prevent="emit('unlock')">
@@ -63,7 +63,7 @@ function updateBufferSection(index: number, typed: string): void {
         {{
           firstTime
             ? "You can always change it later."
-            : "Your writing is encrypted and added to your vault once you unlock it."
+            : "Your writing space is encrypted and added to your vault once you unlock it."
         }}
       </p>
       <input
@@ -84,24 +84,24 @@ function updateBufferSection(index: number, typed: string): void {
     </form>
 
     <main v-else class="view write">
-      <template v-for="(section, index) in bufferSections" :key="index">
+      <template v-for="(section, index) in writingSpaceSections" :key="index">
         <p v-if="section.timestamp" class="entry-time">{{ section.timestamp }}</p>
         <textarea
           :id="index === 0 ? 'buffer-input' : undefined"
           :value="section.text.slice(leadingSpace(section.text).length)"
-          :placeholder="index === bufferSections.length - 1 ? 'Write here' : undefined"
+          :placeholder="index === writingSpaceSections.length - 1 ? 'Write here' : undefined"
           class="write-area"
           :aria-label="`Writing section ${index + 1}`"
-          @input="updateBufferSection(index, ($event.target as HTMLTextAreaElement).value)"
+          @input="updateWritingSpaceSection(index, ($event.target as HTMLTextAreaElement).value)"
         />
       </template>
     </main>
 
     <button
-      v-if="mode === 'buffer'"
+      v-if="mode === 'writingSpace'"
       type="button"
       class="fab"
-      :aria-label="firstTime ? 'Encrypt thoughts' : 'Unlock Vault'"
+      :aria-label="firstTime ? 'Encrypt writing space' : 'Unlock Vault'"
       @click="emit('toggleMode')"
     >
       <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
