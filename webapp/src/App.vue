@@ -19,6 +19,7 @@ const initialized = ref(false);
 const storageError = ref("");
 const firstTime = ref(false);
 const isFirstTimeImportView = ref(false);
+const isLockedExportView = ref(false);
 const importing = ref<string | null>(null);
 
 const mode = ref<"writingSpace" | "unlock">("writingSpace");
@@ -181,6 +182,19 @@ async function handleAuth(): Promise<void> {
   } else {
     await unlock();
   }
+}
+
+async function openLockedExport(): Promise<void> {
+  isLockedExportView.value = true;
+  changePasswordVisible.value = false;
+  await openExport("encrypted");
+}
+
+function closeLockedExport(): void {
+  isLockedExportView.value = false;
+  backupVisible.value = false;
+  backupText.value = "";
+  backupStatus.value = "";
 }
 
 function openFirstTimeImport(): void {
@@ -463,6 +477,31 @@ onBeforeUnmount(() => {
   <main v-else-if="!initialized" class="splash">
     <h2>Opening DayMemory…</h2>
   </main>
+  <template v-else-if="isLockedExportView">
+    <div class="app">
+      <header class="app-header">
+        <button type="button" class="text-btn" @click="closeLockedExport">Back</button>
+        <h1>Export vault</h1>
+      </header>
+
+      <main class="view">
+        <SettingsView
+          :backup-visible="backupVisible"
+          :change-password-visible="false"
+          :backup-mode="backupMode"
+          :backup-text="backupText"
+          :backup-status="backupStatus"
+          :old-password="oldPassword"
+          :new-password="newPassword"
+          :password-confirmation="passwordConfirmation"
+          :password-status="passwordStatus"
+          :export-only="true"
+          @submit-backup="submitBackup"
+          @update:backup-text="backupText = $event"
+        />
+      </main>
+    </div>
+  </template>
   <template v-else-if="isFirstTimeImportView">
     <div class="app">
       <header class="app-header">
@@ -510,6 +549,7 @@ onBeforeUnmount(() => {
       @update:writing-space-text="updateWritingSpace"
       @toggle-mode="mode = mode === 'writingSpace' ? 'unlock' : 'writingSpace'"
       @open-first-time-import="openFirstTimeImport"
+      @open-locked-export="openLockedExport"
     />
     <MainApp
       v-else

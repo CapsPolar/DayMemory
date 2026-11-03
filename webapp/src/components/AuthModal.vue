@@ -23,6 +23,7 @@ const emit = defineEmits<{
   "update:writingSpaceText": [value: string];
   toggleMode: [];
   openFirstTimeImport: [];
+  openLockedExport: [];
 }>();
 
 const authTitle = computed(() => {
@@ -160,6 +161,14 @@ function updateWritingSpaceSection(index: number, typed: string): void {
                 @click="emit('openFirstTimeImport')"
               >
                 Looking to restore your vault? Import vault
+              </button>
+              <button
+                v-if="!firstTime && importing !== 'plain'"
+                type="button"
+                class="text-btn muted"
+                @click="emit('openLockedExport')"
+              >
+                Export encrypted vault string
               </button>
             </div>
 
