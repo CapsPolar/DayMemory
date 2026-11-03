@@ -35,6 +35,9 @@ const editText = ref("");
 const searchQuery = ref("");
 const activeMatchIndex = ref(0);
 
+// Long-press timer tracking
+let longPressTimer: number | null = null;
+
 function scrollToBottom(): void {
   nextTick(() => {
     const container = document.querySelector(".view") || window;
@@ -315,6 +318,26 @@ function saveSection(section: HistorySection): void {
   emit("update:content", newContent);
   cancelEditing();
 }
+
+// Event handlers for alternative triggers
+function handleContextMenu(section: HistorySection, event: MouseEvent): void {
+  event.preventDefault(); // Prevent the native browser context menu
+  startEditing(section);
+}
+
+function startLongPress(section: HistorySection): void {
+  cancelLongPress();
+  longPressTimer = window.setTimeout(() => {
+    startEditing(section);
+  }, 600); // 600ms hold counts as long press
+}
+
+function cancelLongPress(): void {
+  if (longPressTimer !== null) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+}
 </script>
 
 <template>
@@ -352,7 +375,19 @@ function saveSection(section: HistorySection): void {
 
   <p v-if="!content" class="empty">Your vault history is empty.</p>
 
-  <article v-for="section in displaySections" :key="section.id" class="entry">
+  <article
+    v-for="section in displaySections"
+    :key="section.id"
+    class="entry"
+    @dblclick="startEditing(section)"
+    @contextmenu="handleContextMenu(section, $event)"
+    @touchstart="startLongPress(section)"
+    @touchend="cancelLongPress"
+    @touchmove="cancelLongPress"
+    @mousedown="startLongPress(section)"
+    @mouseup="cancelLongPress"
+    @mouseleave="cancelLongPress"
+  >
     <p class="entry-text">
       <span v-if="section.timestamp" class="entry-time">
         <template
@@ -381,7 +416,7 @@ function saveSection(section: HistorySection): void {
         </template>
       </span>
     </p>
-    <button type="button" class="text-btn" aria-label="Edit entry" @click="startEditing(section)">
+    <button type="button" class="text-btn" aria-label="Edit entry" @click.stop="startEditing(section)">
       Edit
     </button>
   </article>
