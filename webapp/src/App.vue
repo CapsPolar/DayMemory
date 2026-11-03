@@ -121,7 +121,11 @@ async function unlock(): Promise<void> {
   let merged = false;
   try {
     success = await vaultService.unlock(enteredPassword);
-    if (success) merged = await mergeWritingSpaceIntoVault();
+    if (success) {
+      merged = await mergeWritingSpaceIntoVault();
+      // Clear the local state so the writing area is fresh when you come back
+      writingSpaceText.value = "";
+    }
   } catch (error) {
     console.error(error);
     vaultService.lock();
