@@ -35,8 +35,6 @@ const bufferSections = computed<BufferSection[]>(() => {
   return sections;
 });
 
-// Whitespace after a timestamp tag is kept in the stored text but hidden in the
-// textarea, so an empty section is truly empty and shows its placeholder.
 function leadingSpace(text: string): string {
   return text.match(/^\s*/)?.[0] ?? "";
 }
@@ -60,21 +58,27 @@ function updateBufferSection(index: number, typed: string): void {
     </header>
 
     <form v-if="mode === 'unlock'" class="view unlock" @submit.prevent="emit('unlock')">
-      <h2>Unlock vault</h2>
-      <p>Your writing is encrypted and added to your vault once you unlock it.</p>
+      <h2>{{ firstTime ? "Set password" : "Unlock vault" }}</h2>
+      <p>
+        {{
+          firstTime
+            ? "You can always change it later."
+            : "Your writing is encrypted and added to your vault once you unlock it."
+        }}
+      </p>
       <input
         id="password-input"
         :value="password"
         type="password"
-        placeholder="Master password"
-        aria-label="Master password"
+        :placeholder="firstTime ? 'New password' : 'Master password'"
+        :aria-label="firstTime ? 'New password' : 'Master password'"
         required
         autocomplete="off"
         :disabled="unlocking"
         @input="emit('update:password', ($event.target as HTMLInputElement).value)"
       />
       <button type="submit" class="btn" :disabled="unlocking">
-        {{ unlocking ? "Unlocking…" : "Unlock" }}
+        {{ unlocking ? (firstTime ? "Encrypting…" : "Unlocking…") : firstTime ? "Set password" : "Unlock" }}
       </button>
       <button type="button" class="text-btn muted" @click="emit('toggleMode')">Cancel</button>
     </form>
@@ -97,14 +101,14 @@ function updateBufferSection(index: number, typed: string): void {
       v-if="mode === 'buffer'"
       type="button"
       class="fab"
-      aria-label="Unlock Vault"
+      :aria-label="firstTime ? 'Encrypt thoughts' : 'Unlock Vault'"
       @click="emit('toggleMode')"
     >
       <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
         <rect x="5" y="11" width="14" height="9" rx="2" />
         <path d="M8 11V8a4 4 0 0 1 7.5-2" />
       </svg>
-      Unlock Vault
+      {{ firstTime ? "Encrypt thoughts" : "Unlock Vault" }}
     </button>
   </div>
 </template>

@@ -38,12 +38,6 @@ const emit = defineEmits<{
   <div class="app">
     <header class="app-header">
       <h1>{{ activeView === "thoughts" ? "History" : "Settings" }}</h1>
-      <button class="icon-btn" title="Lock Vault" aria-label="Lock Vault" @click="emit('lock')">
-        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-          <rect x="5" y="11" width="14" height="9" rx="2" />
-          <path d="M8 11V8a4 4 0 0 1 8 0v3" />
-        </svg>
-      </button>
     </header>
 
     <main class="view">
@@ -75,6 +69,20 @@ const emit = defineEmits<{
         @update:password-confirmation="emit('update:passwordConfirmation', $event)"
       />
     </main>
+
+    <button
+      v-if="activeView === 'thoughts'"
+      type="button"
+      class="fab with-nav"
+      aria-label="Lock vault and write"
+      @click="emit('lock')"
+    >
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 20h9" />
+        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+      </svg>
+      Write…
+    </button>
 
     <nav class="bottom-nav" aria-label="Main navigation">
       <button
