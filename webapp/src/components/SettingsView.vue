@@ -1,6 +1,6 @@
 <!-- SettingsView.vue -->
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { getTheme, setTheme, type Theme } from "../theme";
 
 const props = defineProps<{
@@ -51,6 +51,12 @@ const modeInfo = {
 
 const info = computed(() => modeInfo[props.backupMode]);
 const isImport = computed(() => props.backupMode.includes("import"));
+const showClipboardFallback = ref(false);
+
+// Reset clipboard fallback view whenever the backup modal closes or mode changes
+watch(() => props.backupVisible, (visible) => {
+  if (!visible) showClipboardFallback.value = false;
+});
 
 const themes: { value: Theme; label: string }[] = [
   { value: "system", label: "System" },
@@ -107,7 +113,7 @@ function triggerFileInput(): void {
 
     <textarea
       :value="backupText"
-      :readonly="!isImport"
+      :readonly="!isImport && !showClipboardFallback"
       :placeholder="isImport ? 'Paste content here or choose a file' : 'Vault data'"
       class="backup-area"
       @input="emit('update:backupText', ($event.target as HTMLTextAreaElement).value)"
@@ -115,6 +121,19 @@ function triggerFileInput(): void {
 
     <template v-if="!isImport">
       <button class="btn" @click="emit('submitBackup', 'file')">Download as .txt</button>
+      
+      <button 
+        type="button" 
+        class="text-btn muted" 
+        style="margin-top: 8px; align-self: center;"
+        @click="showClipboardFallback = !showClipboardFallback"
+      >
+        {{ showClipboardFallback ? "Hide copy option" : "Have trouble downloading?" }}
+      </button>
+
+      <button v-if="showClipboardFallback" class="btn secondary" style="margin-top: 6px;" @click="emit('submitBackup', 'clipboard')">
+        Copy to clipboard
+      </button>
     </template>
     <button v-else class="btn danger" @click="emit('submitBackup', 'restore')">Restore backup (overwrite)</button>
 
