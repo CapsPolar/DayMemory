@@ -590,3 +590,18 @@ mark.search-highlight.active {
 .sheet-slide-leave-active .sheet {
     transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1);
 }
+
+/* Auth Bottom Sheet adjustments */
+.auth-sheet {
+  height: auto;
+  max-height: 85vh;
+  max-height: 85dvh;
+}
+
+.sheet-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px var(--gutter) calc(24px + var(--bottom));
+  overflow-y: auto;
+}

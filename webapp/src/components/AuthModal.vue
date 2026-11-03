@@ -88,35 +88,7 @@ function updateWritingSpaceSection(index: number, typed: string): void {
       <span v-if="writingSpaceSaveStatus" class="status">{{ writingSpaceSaveStatus }}</span>
     </header>
 
-    <form v-if="mode === 'unlock' || firstTimeImportState" class="view unlock" @submit.prevent="emit('unlock')">
-      <h2>{{ authTitle }}</h2>
-      <p>{{ authHint }}</p>
-      <input
-        id="password-input"
-        :value="password"
-        type="password"
-        :placeholder="authPlaceholder"
-        :aria-label="authPlaceholder"
-        required
-        autocomplete="off"
-        :disabled="unlocking"
-        @input="emit('update:password', ($event.target as HTMLInputElement).value)"
-      />
-      <button type="submit" class="btn" :disabled="unlocking">
-        {{ authButtonText }}
-      </button>
-      <button
-        v-if="firstTime && !firstTimeImportState"
-        type="button"
-        class="text-btn muted"
-        @click="emit('openFirstTimeImport')"
-      >
-        Looking to restore your vault? Import vault
-      </button>
-      <button v-if="!firstTimeImportState" type="button" class="text-btn muted" @click="emit('toggleMode')">Cancel</button>
-    </form>
-
-    <main v-else class="view write">
+    <main class="view write">
       <template v-for="(section, index) in writingSpaceSections" :key="index">
         <p v-if="section.timestamp" class="entry-time">{{ section.timestamp }}</p>
         <textarea
@@ -143,5 +115,70 @@ function updateWritingSpaceSection(index: number, typed: string): void {
       </svg>
       {{ firstTime ? "Encrypt thoughts" : "Unlock Vault" }}
     </button>
+
+    <Transition name="sheet-slide">
+      <div
+        v-if="mode === 'unlock' || firstTimeImportState"
+        class="sheet-backdrop"
+        @click.self="!firstTimeImportState && emit('toggleMode')"
+      >
+        <div class="sheet auth-sheet">
+          <header class="app-header">
+            <h1>{{ authTitle }}</h1>
+            <button
+              v-if="!firstTimeImportState"
+              type="button"
+              class="icon-btn"
+              aria-label="Close"
+              @click="emit('toggleMode')"
+            >
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </header>
+
+          <form class="sheet-form" @submit.prevent="emit('unlock')">
+            <div class="sheet-content">
+              <p class="hint">{{ authHint }}</p>
+              <input
+                id="password-input"
+                :value="password"
+                type="password"
+                :placeholder="authPlaceholder"
+                :aria-label="authPlaceholder"
+                required
+                autocomplete="off"
+                :disabled="unlocking"
+                @input="emit('update:password', ($event.target as HTMLInputElement).value)"
+              />
+              <button
+                v-if="firstTime && !firstTimeImportState"
+                type="button"
+                class="text-btn muted"
+                @click="emit('openFirstTimeImport')"
+              >
+                Looking to restore your vault? Import vault
+              </button>
+            </div>
+
+            <div class="sheet-actions">
+              <button
+                v-if="!firstTimeImportState"
+                type="button"
+                class="btn secondary"
+                @click="emit('toggleMode')"
+              >
+                Cancel
+              </button>
+              <button type="submit" class="btn" :disabled="unlocking">
+                {{ authButtonText }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
