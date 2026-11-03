@@ -9,7 +9,7 @@ interface WritingSpaceSection {
 
 const props = defineProps<{
   firstTime: boolean;
-  firstTimeImportState?: string | null;
+  importing?: string | null;
   mode: "writingSpace" | "unlock";
   password: string;
   writingSpaceText: string;
@@ -26,31 +26,31 @@ const emit = defineEmits<{
 }>();
 
 const authTitle = computed(() => {
-  if (props.firstTimeImportState === "plain") return "Set password";
-  if (props.firstTimeImportState === "vault") return "Unlock vault";
+  if (props.importing === "plain") return "Set password";
+  if (props.importing === "vault") return "Unlock vault";
   return props.firstTime ? "Set password" : "Unlock vault";
 });
 
 const authHint = computed(() => {
-  if (props.firstTimeImportState === "plain") return "Import complete, now please set a password";
-  if (props.firstTimeImportState === "vault") return "Import complete, now enter the vault password";
+  if (props.importing === "plain") return "Import complete, now please set a password";
+  if (props.importing === "vault") return "Import complete, now enter the vault password";
   return props.firstTime ? "You can always change it later." : "Your writing space is encrypted and added to your vault once you unlock it.";
 });
 
 const authPlaceholder = computed(() => {
-  if (props.firstTimeImportState === "plain") return "New password";
-  if (props.firstTimeImportState === "vault") return "Vault password";
+  if (props.importing === "plain") return "New password";
+  if (props.importing === "vault") return "Vault password";
   return props.firstTime ? "New password" : "Master password";
 });
 
 const authButtonText = computed(() => {
   if (props.unlocking) {
-    if (props.firstTimeImportState === "plain") return "Setting password…";
-    if (props.firstTimeImportState === "vault") return "Unlocking…";
+    if (props.importing === "plain") return "Setting password…";
+    if (props.importing === "vault") return "Unlocking…";
     return props.firstTime ? "Encrypting…" : "Unlocking…";
   }
-  if (props.firstTimeImportState === "plain") return "Set password";
-  if (props.firstTimeImportState === "vault") return "Unlock vault";
+  if (props.importing === "plain") return "Set password";
+  if (props.importing === "vault") return "Unlock vault";
   return props.firstTime ? "Set password" : "Unlock";
 });
 
@@ -103,7 +103,7 @@ function updateWritingSpaceSection(index: number, typed: string): void {
     </main>
 
     <button
-      v-if="mode === 'writingSpace' && !firstTimeImportState"
+      v-if="mode === 'writingSpace' && !importing"
       type="button"
       class="fab"
       :aria-label="firstTime ? 'Encrypt writing space' : 'Unlock Vault'"
@@ -118,15 +118,15 @@ function updateWritingSpaceSection(index: number, typed: string): void {
 
     <Transition name="sheet-slide">
       <div
-        v-if="mode === 'unlock' || firstTimeImportState"
+        v-if="mode === 'unlock' || importing"
         class="sheet-backdrop"
-        @click.self="!firstTimeImportState && emit('toggleMode')"
+        @click.self="!importing && emit('toggleMode')"
       >
         <div class="sheet auth-sheet">
           <header class="app-header">
             <h1>{{ authTitle }}</h1>
             <button
-              v-if="!firstTimeImportState"
+              v-if="!importing"
               type="button"
               class="icon-btn"
               aria-label="Close"
@@ -154,7 +154,7 @@ function updateWritingSpaceSection(index: number, typed: string): void {
                 @input="emit('update:password', ($event.target as HTMLInputElement).value)"
               />
               <button
-                v-if="firstTime && !firstTimeImportState"
+                v-if="firstTime && !importing"
                 type="button"
                 class="text-btn muted"
                 @click="emit('openFirstTimeImport')"
@@ -165,7 +165,7 @@ function updateWritingSpaceSection(index: number, typed: string): void {
 
             <div class="sheet-actions">
               <button
-                v-if="!firstTimeImportState"
+                v-if="!importing"
                 type="button"
                 class="btn secondary"
                 @click="emit('toggleMode')"

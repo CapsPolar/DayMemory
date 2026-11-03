@@ -19,7 +19,7 @@ const initialized = ref(false);
 const storageError = ref("");
 const firstTime = ref(false);
 const isFirstTimeImportView = ref(false);
-const firstTimeImportState = ref<string | null>(null);
+const importing = ref<string | null>(null);
 
 const mode = ref<"writingSpace" | "unlock">("writingSpace");
 const password = ref("");
@@ -78,12 +78,12 @@ async function initialize(): Promise<void> {
     vaultService = new VaultService(storage, new CryptoJSAdapter());
     writingSpaceService = new BufferService(storage);
 
-    const storedImportState = await storage.getItem("firsttimeimport");
-    if (storedImportState) {
-      firstTimeImportState.value = storedImportState;
+    const storedImport = await storage.getItem("importing");
+    if (storedImport) {
+      importing.value = storedImport;
     }
 
-    firstTime.value = !(await vaultService.hasVault()) && !storedImportState;
+    firstTime.value = !(await vaultService.hasVault()) && !storedImport;
 
     const storedWritingSpace = await writingSpaceService.getBuffer();
     const initialText = withFreshTimestamp(storedWritingSpace);
@@ -143,20 +143,20 @@ async function unlock(): Promise<void> {
 }
 
 async function handleAuth(): Promise<void> {
-  if (firstTimeImportState.value) {
+  if (importing.value) {
     const enteredPassword = password.value.trim();
     if (!enteredPassword || unlocking.value || !vaultService || !storageInstance) return;
 
     unlocking.value = true;
     try {
-      if (firstTimeImportState.value === "plain") {
+      if (importing.value === "plain") {
         const success = await vaultService.changePassword("temp-dummy-password-for-import", enteredPassword);
         if (!success) {
           showToast("Failed to set new password.");
           unlocking.value = false;
           return;
         }
-      } else if (firstTimeImportState.value === "vault") {
+      } else if (importing.value === "vault") {
         const success = await vaultService.unlock(enteredPassword);
         if (!success) {
           password.value = "";
@@ -166,8 +166,8 @@ async function handleAuth(): Promise<void> {
         }
       }
 
-      await storageInstance.removeItem("firsttimeimport");
-      firstTimeImportState.value = null;
+      await storageInstance.removeItem("importing");
+      importing.value = null;
 
       isUnlocked.value = true;
       content.value = vaultService.getContent();
@@ -218,8 +218,8 @@ async function submitFirstTimeImportBackup(): Promise<void> {
       await vaultService.importRaw(raw);
     }
 
-    await storageInstance.setItem("firsttimeimport", importType);
-    firstTimeImportState.value = importType;
+    await storageInstance.setItem("importing", importType);
+    importing.value = importType;
     firstTime.value = false;
 
     isFirstTimeImportView.value = false;
@@ -373,11 +373,13 @@ async function submitBackup(actionType: "clipboard" | "file" | "restore"): Promi
   }
 
   try {
-    if (!vaultService) throw new Error("Vault service is not initialized.");
+    if (!vaultService || !storageInstance) throw new Error("Vault service is not initialized.");
     if (isUnencryptedImport) {
       await vaultService.saveContent(raw);
+      // await storageInstance.setItem("importing", "plain");
     } else {
       await vaultService.importRaw(raw);
+      await storageInstance.setItem("importing", "vault");
     }
   } catch (error) {
     console.error(error);
@@ -497,7 +499,7 @@ onBeforeUnmount(() => {
     <AuthModal
       v-if="!isUnlocked"
       :first-time="firstTime"
-      :first-time-import-state="firstTimeImportState"
+      :importing="importing"
       :mode="mode"
       :password="password"
       :writing-space-text="writingSpaceText"
