@@ -15,6 +15,7 @@ defineProps<{
   newPassword: string;
   passwordConfirmation: string;
   passwordStatus: string;
+  reminderIntervalDays: number;
 }>();
 
 const emit = defineEmits<{
@@ -30,6 +31,7 @@ const emit = defineEmits<{
   "update:oldPassword": [value: string];
   "update:newPassword": [value: string];
   "update:passwordConfirmation": [value: string];
+  "update:reminderIntervalDays": [value: number];
   "update:content": [value: string];
 }>();
 </script>
@@ -57,6 +59,7 @@ const emit = defineEmits<{
         :new-password="newPassword"
         :password-confirmation="passwordConfirmation"
         :password-status="passwordStatus"
+        :reminder-interval-days="reminderIntervalDays"
         @open-export="emit('openExport', $event)"
         @open-import="emit('openImport', $event)"
         @toggle-password-panel="emit('togglePasswordPanel')"
@@ -67,6 +70,7 @@ const emit = defineEmits<{
         @update:old-password="emit('update:oldPassword', $event)"
         @update:new-password="emit('update:newPassword', $event)"
         @update:password-confirmation="emit('update:passwordConfirmation', $event)"
+        @update:reminder-interval-days="emit('update:reminderIntervalDays', $event)"
       />
     </main>
 

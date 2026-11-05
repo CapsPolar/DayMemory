@@ -13,6 +13,7 @@ const props = defineProps<{
   newPassword: string;
   passwordConfirmation: string;
   passwordStatus: string;
+  reminderIntervalDays: number;
   isFirstTimeImport?: boolean;
   exportOnly?: boolean;
 }>();
@@ -28,6 +29,7 @@ const emit = defineEmits<{
   "update:oldPassword": [value: string];
   "update:newPassword": [value: string];
   "update:passwordConfirmation": [value: string];
+  "update:reminderIntervalDays": [value: number];
 }>();
 
 const modeInfo = {
@@ -53,7 +55,6 @@ const info = computed(() => modeInfo[props.backupMode]);
 const isImport = computed(() => props.backupMode.includes("import"));
 const showClipboardFallback = ref(false);
 
-// Reset clipboard fallback view whenever the backup modal closes or mode changes
 watch(() => props.backupVisible, (visible) => {
   if (!visible) showClipboardFallback.value = false;
 });
@@ -93,6 +94,26 @@ function triggerFileInput(): void {
       </button>
     </div>
   </div>
+
+  <div v-if="!isFirstTimeImport && !exportOnly" class="list-row">
+    Backup reminder
+    <select
+      :value="reminderIntervalDays"
+      class="select-input"
+      style="width: auto; min-width: 140px; height: 36px;"
+      aria-label="Backup reminder interval"
+      @change="emit('update:reminderIntervalDays', Number(($event.target as HTMLSelectElement).value))"
+    >
+      <option :value="1">Every day</option>
+      <option :value="2">Every 2 days</option>
+      <option :value="3">Every 3 days</option>
+      <option :value="7">Every 7 days</option>
+      <option :value="14">Every 14 days</option>
+      <option :value="30">Every 30 days</option>
+      <option :value="0">Disabled</option>
+    </select>
+  </div>
+
   <button v-if="!isFirstTimeImport && !exportOnly" class="list-row" @click="emit('openExport', 'encrypted')">Export encrypted vault string</button>
   <button v-if="!isFirstTimeImport && !exportOnly" class="list-row" @click="emit('openExport', 'unencrypted')">
     Export unencrypted plain history text

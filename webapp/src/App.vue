@@ -41,6 +41,15 @@ const newPassword = ref("");
 const passwordConfirmation = ref("");
 const passwordStatus = ref("");
 
+// Backup Reminder State
+const showBackupReminder = ref(false);
+const dontShowBackupReminderAgain = ref(false);
+const reminderIntervalDays = ref<number>(2);
+
+const LAST_EXPORT_KEY = "daymemory-last-export-timestamp";
+const DONT_SHOW_REMINDER_KEY = "daymemory-dont-show-backup-reminder";
+const REMINDER_INTERVAL_KEY = "daymemory-backup-reminder-interval";
+
 let vaultService: VaultService | null = null;
 let writingSpaceService: BufferService | null = null;
 let storageInstance: IndexedDBAdapter | null = null;
@@ -71,11 +80,103 @@ function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+async function loadReminderSettings(): Promise<void> {
+  if (!storageInstance) return;
+  try {
+    const savedInterval = await storageInstance.getItem(REMINDER_INTERVAL_KEY);
+    if (savedInterval !== null) {
+      reminderIntervalDays.value = Number(savedInterval);
+    }
+  } catch (e) {
+    console.error("Failed to load reminder interval from adapter", e);
+  }
+}
+
+async function updateReminderIntervalDays(days: number): Promise<void> {
+  reminderIntervalDays.value = days;
+  if (!storageInstance) return;
+  try {
+    await storageInstance.setItem(REMINDER_INTERVAL_KEY, String(days));
+    if (days === 0) {
+      await storageInstance.setItem(DONT_SHOW_REMINDER_KEY, "true");
+    } else {
+      await storageInstance.removeItem(DONT_SHOW_REMINDER_KEY);
+    }
+  } catch (e) {
+    console.error("Failed to update reminder interval in adapter", e);
+  }
+}
+
+async function checkVaultExportReminder(): Promise<void> {
+  if (!storageInstance) return;
+  try {
+    if (reminderIntervalDays.value === 0) return;
+
+    const dontShow = (await storageInstance.getItem(DONT_SHOW_REMINDER_KEY)) === "true";
+    if (dontShow) return;
+
+    const lastExportStr = await storageInstance.getItem(LAST_EXPORT_KEY);
+    const now = Date.now();
+    const intervalMs = reminderIntervalDays.value /** 24 * 60 **/* 60 * 1000;
+
+    if (!lastExportStr || now - Number(lastExportStr) >= intervalMs) {
+      showBackupReminder.value = true;
+    }
+  } catch (e) {
+    console.error("Failed to check backup reminder state from adapter", e);
+  }
+}
+
+async function recordExportTimestamp(): Promise<void> {
+  if (!storageInstance) return;
+  try {
+    await storageInstance.setItem(LAST_EXPORT_KEY, String(Date.now()));
+  } catch (e) {
+    console.error("Failed to save export timestamp to adapter", e);
+  }
+}
+
+async function closeBackupReminder(): Promise<void> {
+  if (dontShowBackupReminderAgain.value && storageInstance) {
+    try {
+      await storageInstance.setItem(DONT_SHOW_REMINDER_KEY, "true");
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  showBackupReminder.value = false;
+}
+
+async function handleReminderBackupNow(): Promise<void> {
+  if (dontShowBackupReminderAgain.value && storageInstance) {
+    try {
+      await storageInstance.setItem(DONT_SHOW_REMINDER_KEY, "true");
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  showBackupReminder.value = false;
+  openLockedExport();
+}
+
+async function handleRemindInSettings(): Promise<void> {
+  if (dontShowBackupReminderAgain.value && storageInstance) {
+    try {
+      await storageInstance.setItem(DONT_SHOW_REMINDER_KEY, "true");
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  showBackupReminder.value = false;
+  navigate("settings");
+}
+
 async function initialize(): Promise<void> {
   const storage = new IndexedDBAdapter();
   storageInstance = storage;
   try {
     await storage.open();
+    await loadReminderSettings();
     vaultService = new VaultService(storage, new CryptoJSAdapter());
     writingSpaceService = new BufferService(storage);
 
@@ -123,7 +224,6 @@ async function unlock(): Promise<void> {
     success = await vaultService.unlock(enteredPassword);
     if (success) {
       merged = await mergeWritingSpaceIntoVault();
-      // Clear the local state so the writing area is fresh when you come back
       writingSpaceText.value = "";
     }
   } catch (error) {
@@ -145,6 +245,7 @@ async function unlock(): Promise<void> {
   content.value = vaultService.getContent();
 
   if (merged) showToast("Your writings were added to the vault");
+  await checkVaultExportReminder();
 }
 
 async function handleAuth(): Promise<void> {
@@ -177,6 +278,7 @@ async function handleAuth(): Promise<void> {
       isUnlocked.value = true;
       content.value = vaultService.getContent();
       showToast("Vault successfully authenticated and unlocked.");
+      await checkVaultExportReminder();
     } catch (error) {
       console.error(error);
       showToast(`Authentication failed (${describeError(error)}).`);
@@ -407,6 +509,10 @@ async function submitBackup(actionType: "clipboard" | "file" | "restore"): Promi
     const label = isEncrypted ? "Encrypted vault string" : "Unencrypted plain history text";
     const filename = isEncrypted ? "daymemory-vault-encrypted.txt" : "daymemory-plain-history.txt";
 
+    if (isEncrypted) {
+      await recordExportTimestamp();
+    }
+
     if (actionType === "clipboard") {
       try {
         await navigator.clipboard.writeText(backupText.value);
@@ -546,9 +652,11 @@ onBeforeUnmount(() => {
           :new-password="newPassword"
           :password-confirmation="passwordConfirmation"
           :password-status="passwordStatus"
+          :reminder-interval-days="reminderIntervalDays"
           :export-only="true"
           @submit-backup="submitBackup"
           @update:backup-text="backupText = $event"
+          @update:reminder-interval-days="updateReminderIntervalDays"
         />
       </main>
     </div>
@@ -570,6 +678,7 @@ onBeforeUnmount(() => {
           :new-password="newPassword"
           :password-confirmation="passwordConfirmation"
           :password-status="passwordStatus"
+          :reminder-interval-days="reminderIntervalDays"
           :is-first-time-import="true"
           @open-export="openExport"
           @open-import="openImport"
@@ -581,6 +690,7 @@ onBeforeUnmount(() => {
           @update:old-password="oldPassword = $event"
           @update:new-password="newPassword = $event"
           @update:password-confirmation="passwordConfirmation = $event"
+          @update:reminder-interval-days="updateReminderIntervalDays"
         />
       </main>
     </div>
@@ -615,6 +725,7 @@ onBeforeUnmount(() => {
       :new-password="newPassword"
       :password-confirmation="passwordConfirmation"
       :password-status="passwordStatus"
+      :reminder-interval-days="reminderIntervalDays"
       @lock="lockVault"
       @navigate="navigate"
       @open-export="openExport"
@@ -627,9 +738,34 @@ onBeforeUnmount(() => {
       @update:old-password="oldPassword = $event"
       @update:new-password="newPassword = $event"
       @update:password-confirmation="passwordConfirmation = $event"
+      @update:reminder-interval-days="updateReminderIntervalDays"
       @update:content="updateVaultContent"
     />
   </template>
+
+  <!-- Backup Reminder Popup -->
+  <Transition name="toast">
+    <div v-if="showBackupReminder" class="backup-reminder-overlay" @click.self="closeBackupReminder">
+      <div class="backup-reminder-card" role="dialog" aria-labelledby="reminder-title">
+        <h2 id="reminder-title">Secure your vault</h2>
+        <p>
+          You haven't exported your encrypted vault string in the last {{ reminderIntervalDays }} {{ reminderIntervalDays === 1 ? 'day' : 'days' }}. Regular backups to another device or cloud storage like Google Drive ensure you never lose your history.
+        </p>
+        <label class="backup-reminder-checkbox">
+          <input
+            v-model="dontShowBackupReminderAgain"
+            type="checkbox"
+          />
+          Don't show again
+        </label>
+        <div class="backup-reminder-actions">
+          <button type="button" class="btn secondary" @click="closeBackupReminder">Close</button>
+          <button type="button" class="btn secondary" @click="handleRemindInSettings">Remind in…</button>
+          <button type="button" class="btn" @click="handleReminderBackupNow">Backup now</button>
+        </div>
+      </div>
+    </div>
+  </Transition>
 
   <Transition name="toast">
     <p v-if="toast" class="toast" role="status">{{ toast }}</p>
