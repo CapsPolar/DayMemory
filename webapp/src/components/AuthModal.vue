@@ -44,17 +44,6 @@ const authPlaceholder = computed(() => {
   return props.firstTime ? "New password" : "Master password";
 });
 
-const authButtonText = computed(() => {
-  if (props.unlocking) {
-    if (props.importing === "plain") return "Setting password…";
-    if (props.importing === "vault") return "Unlocking…";
-    return props.firstTime ? "Encrypting…" : "Unlocking…";
-  }
-  if (props.importing === "plain") return "Set password";
-  if (props.importing === "vault") return "Unlock vault";
-  return props.firstTime ? "Set password" : "Unlock";
-});
-
 const writingSpaceSections = computed<WritingSpaceSection[]>(() => {
   const parts = props.writingSpaceText.split(/(\[TIME\s+[^\]]+\]:)/g);
   if (parts.length === 1) return [{ timestamp: "", text: parts[0] }];
@@ -125,23 +114,37 @@ function updateWritingSpaceSection(index: number, typed: string): void {
       >
         <div class="sheet auth-sheet">
           <div class="sheet-handle" />
-          <header class="app-header">
-            <h1>{{ authTitle }}</h1>
-            <button
-              v-if="!importing"
-              type="button"
-              class="icon-btn"
-              aria-label="Close"
-              @click="emit('toggleMode')"
-            >
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          </header>
 
           <form class="sheet-form" @submit.prevent="emit('unlock')">
+            <header class="app-header">
+              <button
+                v-if="!importing"
+                type="button"
+                class="sheet-action-btn cancel"
+                aria-label="Close"
+                @click="emit('toggleMode')"
+              >
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+              <div v-else style="width: 36px;" />
+
+              <h1>{{ authTitle }}</h1>
+
+              <button
+                type="submit"
+                class="sheet-action-btn submit"
+                aria-label="Submit password"
+                :disabled="unlocking"
+              >
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              </button>
+            </header>
+
             <div class="sheet-content">
               <p class="hint">{{ authHint }}</p>
               <input
@@ -170,20 +173,6 @@ function updateWritingSpaceSection(index: number, typed: string): void {
                 @click="emit('openLockedExport')"
               >
                 Export encrypted vault string
-              </button>
-            </div>
-
-            <div class="sheet-actions">
-              <button
-                v-if="!importing"
-                type="button"
-                class="btn secondary"
-                @click="emit('toggleMode')"
-              >
-                Cancel
-              </button>
-              <button type="submit" class="btn" :disabled="unlocking">
-                {{ authButtonText }}
               </button>
             </div>
           </form>

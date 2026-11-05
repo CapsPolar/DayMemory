@@ -144,8 +144,35 @@ button {
     color: var(--text);
 }
 
-.icon-btn:disabled {
-    opacity: 0.35;
+/* Larger circular action buttons for sheet headers */
+.sheet-action-btn {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 0;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.sheet-action-btn:active {
+    transform: scale(0.92);
+}
+
+.sheet-action-btn.cancel {
+    background: var(--surface);
+    color: var(--text);
+}
+
+.sheet-action-btn.submit {
+    background: var(--accent);
+    color: var(--on-accent);
+}
+
+.sheet-action-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
 }
 
 .text-btn {
@@ -526,7 +553,7 @@ mark.search-highlight.active {
 
 .sheet .app-header {
     background: transparent;
-    height: 48px;
+    height: 52px;
     padding: 0 var(--gutter);
     border-bottom: 1px solid var(--line);
 }
@@ -538,27 +565,12 @@ mark.search-highlight.active {
 .sheet textarea {
     flex: 1;
     width: 100%;
-    padding: 8px var(--gutter);
+    padding: 8px var(--gutter) calc(16px + var(--bottom));
     background: transparent;
     border: 0;
     outline: none;
     resize: none;
     line-height: 1.6;
-}
-
-/* Sheet Footer Action Bar */
-.sheet-actions {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px var(--gutter) calc(12px + var(--bottom));
-    background: var(--surface-elevated);
-    border-top: 1px solid var(--line);
-}
-
-.sheet-actions .btn {
-    flex: 1;
-    height: 44px;
 }
 
 /* Vue Transition for Bottom Sheet */
@@ -587,6 +599,11 @@ mark.search-highlight.active {
     height: auto;
     max-height: 85vh;
     max-height: 85dvh;
+}
+
+.sheet-form {
+    display: flex;
+    flex-direction: column;
 }
 
 .sheet-content {

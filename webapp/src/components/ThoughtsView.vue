@@ -427,24 +427,34 @@ function cancelLongPress(): void {
         <div class="sheet">
           <div class="sheet-handle" />
           <header class="app-header">
+            <button
+              type="button"
+              class="sheet-action-btn cancel"
+              aria-label="Cancel editing"
+              @click="cancelEditing"
+            >
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+
             <h1>Edit entry</h1>
+
+            <button
+              type="button"
+              class="sheet-action-btn submit"
+              aria-label="Save changes"
+              @click="editingSection && saveSection(editingSection)"
+            >
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </button>
           </header>
 
           <p v-if="editTimestamp" class="entry-time">{{ editTimestamp }}</p>
           <textarea v-model="editText" aria-label="Entry content" />
-
-          <footer class="sheet-actions">
-            <button type="button" class="btn secondary" @click="cancelEditing">
-              Cancel
-            </button>
-            <button
-              type="button"
-              class="btn"
-              @click="editingSection && saveSection(editingSection)"
-            >
-              Save
-            </button>
-          </footer>
         </div>
       </div>
     </Transition>
