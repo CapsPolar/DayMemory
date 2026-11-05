@@ -35,9 +35,6 @@ const editText = ref("");
 const searchQuery = ref("");
 const activeMatchIndex = ref(0);
 
-// Long-press timer tracking
-let longPressTimer: number | null = null;
-
 function scrollToBottom(): void {
   nextTick(() => {
     const container = document.querySelector(".view") || window;
@@ -319,24 +316,9 @@ function saveSection(section: HistorySection): void {
   cancelEditing();
 }
 
-// Event handlers for alternative triggers
+// Event handler for context menu to prevent browser native menu interference
 function handleContextMenu(section: HistorySection, event: MouseEvent): void {
-  event.preventDefault(); // Prevent the native browser context menu
-  startEditing(section);
-}
-
-function startLongPress(section: HistorySection): void {
-  cancelLongPress();
-  longPressTimer = window.setTimeout(() => {
-    startEditing(section);
-  }, 600); // 600ms hold counts as long press
-}
-
-function cancelLongPress(): void {
-  if (longPressTimer !== null) {
-    clearTimeout(longPressTimer);
-    longPressTimer = null;
-  }
+  event.preventDefault();
 }
 </script>
 
@@ -381,12 +363,6 @@ function cancelLongPress(): void {
     class="entry"
     @dblclick="startEditing(section)"
     @contextmenu="handleContextMenu(section, $event)"
-    @touchstart="startLongPress(section)"
-    @touchend="cancelLongPress"
-    @touchmove="cancelLongPress"
-    @mousedown="startLongPress(section)"
-    @mouseup="cancelLongPress"
-    @mouseleave="cancelLongPress"
   >
     <p class="entry-text">
       <span v-if="section.timestamp" class="entry-time">

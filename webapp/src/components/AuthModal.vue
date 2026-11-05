@@ -69,6 +69,19 @@ function updateWritingSpaceSection(index: number, typed: string): void {
     updatedSections.map(section => section.timestamp + section.text).join("")
   );
 }
+
+function focusLastTextarea(event: MouseEvent): void {
+  const target = event.target as HTMLElement;
+  if (target.classList.contains("write")) {
+    const textareas = target.querySelectorAll<HTMLTextAreaElement>("textarea");
+    const lastTextarea = textareas[textareas.length - 1];
+    if (lastTextarea) {
+      lastTextarea.focus();
+      // Move cursor to end of text
+      lastTextarea.setSelectionRange(lastTextarea.value.length, lastTextarea.value.length);
+    }
+  }
+}
 </script>
 
 <template>
@@ -78,7 +91,7 @@ function updateWritingSpaceSection(index: number, typed: string): void {
       <span v-if="writingSpaceSaveStatus" class="status">{{ writingSpaceSaveStatus }}</span>
     </header>
 
-    <main class="view write">
+    <main class="view write" @click="focusLastTextarea">
       <template v-for="(section, index) in writingSpaceSections" :key="index">
         <p v-if="section.timestamp" class="entry-time">{{ section.timestamp }}</p>
         <textarea
@@ -129,7 +142,7 @@ function updateWritingSpaceSection(index: number, typed: string): void {
                   <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
               </button>
-              <div v-else style="width: 36px;" />
+              <div v-else style="width: 44px;" />
 
               <h1>{{ authTitle }}</h1>
 

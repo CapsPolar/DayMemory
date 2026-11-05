@@ -225,7 +225,7 @@ button {
 .fab {
     position: fixed;
     right: 16px;
-    bottom: calc(16px + var(--bottom));
+    bottom: calc(16px + var(--bottom) + env(keyboard-inset-height, 0px));
     z-index: 20;
     display: flex;
     align-items: center;
@@ -239,11 +239,11 @@ button {
     font-weight: 600;
     color: var(--on-accent);
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
-    transition: transform 0.15s ease;
+    transition: bottom 0.1s ease, transform 0.15s ease;
 }
 
 .fab.with-nav {
-    bottom: calc(52px + 16px + var(--bottom));
+    bottom: calc(52px + 16px + var(--bottom) + env(keyboard-inset-height, 0px));
 }
 
 .fab:active {
@@ -264,7 +264,9 @@ input[type="search"] {
 
 /* Writing */
 .write {
-    padding-bottom: calc(80px + var(--bottom));
+    display: flex;
+    flex-direction: column;
+    padding-bottom: calc(90px + var(--bottom));
 }
 
 .write .entry-time {
@@ -286,7 +288,8 @@ input[type="search"] {
 }
 
 .write-area:last-of-type {
-    min-height: 60dvh;
+    flex: 1;
+    min-height: 100%;
 }
 
 .entry-time {
