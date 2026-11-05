@@ -1,10 +1,11 @@
 <!-- MainApp.vue -->
 <script setup lang="ts">
 import ThoughtsView from "./ThoughtsView.vue";
+import AnalyticsView from "./AnalyticsView.vue";
 import SettingsView from "./SettingsView.vue";
 
 defineProps<{
-  activeView: "thoughts" | "settings";
+  activeView: "thoughts" | "analytics" | "settings";
   content: string;
   backupVisible: boolean;
   changePasswordVisible: boolean;
@@ -20,7 +21,7 @@ defineProps<{
 
 const emit = defineEmits<{
   lock: [];
-  navigate: [view: "thoughts" | "settings"];
+  navigate: [view: "thoughts" | "analytics" | "settings"];
   openExport: [type: "encrypted" | "unencrypted"];
   openImport: [type: "encrypted" | "unencrypted"];
   togglePasswordPanel: [];
@@ -39,7 +40,7 @@ const emit = defineEmits<{
 <template>
   <div class="app">
     <header class="app-header">
-      <h1>{{ activeView === "thoughts" ? "History" : "Settings" }}</h1>
+      <h1>{{ activeView === "thoughts" ? "History" : activeView === "analytics" ? "Analytics" : "Settings" }}</h1>
     </header>
 
     <main class="view">
@@ -47,6 +48,9 @@ const emit = defineEmits<{
         v-if="activeView === 'thoughts'"
         :content="content"
         @update:content="emit('update:content', $event)"
+      />
+      <AnalyticsView
+        v-else-if="activeView === 'analytics'"
       />
       <SettingsView
         v-else
@@ -100,6 +104,19 @@ const emit = defineEmits<{
           <polyline points="12 7.5 12 12 15 14" />
         </svg>
         History
+      </button>
+      <button
+        class="nav-item"
+        :class="{ active: activeView === 'analytics' }"
+        :aria-current="activeView === 'analytics' ? 'page' : undefined"
+        @click="emit('navigate', 'analytics')"
+      >
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+          <line x1="18" y1="20" x2="18" y2="10" />
+          <line x1="12" y1="20" x2="12" y2="4" />
+          <line x1="6" y1="20" x2="6" y2="14" />
+        </svg>
+        Analytics
       </button>
       <button
         class="nav-item"

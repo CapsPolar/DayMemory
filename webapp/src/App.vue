@@ -28,7 +28,7 @@ const unlocking = ref(false);
 const writingSpaceText = ref("");
 const writingSpaceSaveStatus = ref("");
 const content = ref("");
-const activeView = ref<"thoughts" | "settings">("thoughts");
+const activeView = ref<"thoughts" | "analytics" | "settings">("thoughts");
 const toast = ref("");
 
 const backupVisible = ref(false);
@@ -117,7 +117,7 @@ async function checkVaultExportReminder(): Promise<void> {
 
     const lastExportStr = await storageInstance.getItem(LAST_EXPORT_KEY);
     const now = Date.now();
-    const intervalMs = reminderIntervalDays.value /** 24 * 60 **/* 60 * 1000;
+    const intervalMs = reminderIntervalDays.value * 24 * 60 * 60 * 1000;
 
     if (!lastExportStr || now - Number(lastExportStr) >= intervalMs) {
       showBackupReminder.value = true;
@@ -379,7 +379,7 @@ async function saveCurrentWritingSpace(): Promise<void> {
   showSavedStatus(writingSpaceSaveStatus);
 }
 
-function navigate(view: "thoughts" | "settings"): void {
+function navigate(view: "thoughts" | "analytics" | "settings"): void {
   activeView.value = view;
   if (view === "settings") {
     backupVisible.value = false;
