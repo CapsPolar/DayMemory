@@ -425,6 +425,7 @@ function cancelLongPress(): void {
     <Transition name="sheet-slide">
       <div v-if="editingSectionId" class="sheet-backdrop" @click.self="cancelEditing">
         <div class="sheet">
+          <div class="sheet-handle" />
           <header class="app-header">
             <h1>Edit entry</h1>
           </header>

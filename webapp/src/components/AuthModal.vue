@@ -124,6 +124,7 @@ function updateWritingSpaceSection(index: number, typed: string): void {
         @click.self="!importing && emit('toggleMode')"
       >
         <div class="sheet auth-sheet">
+          <div class="sheet-handle" />
           <header class="app-header">
             <h1>{{ authTitle }}</h1>
             <button
