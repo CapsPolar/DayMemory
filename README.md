@@ -1,79 +1,86 @@
-# DayMemory AI
+# DayMemory
 
-Hexagonal-architecture rewrite, TypeScript + Vite.
+### A quiet place to put your thoughts down.
 
-## Layout
+DayMemory is a private, local-first journal for the things you want to remember: a passing thought, a rough day, a small win, or the numbers you want to look back on later. Open it, write without breaking your flow, and unlock your history when you're ready.
 
-```
-core/                     Pure business logic. No browser APIs, no imports from webapp/.
-  models/                 Memory, Agent, Settings — plain TS types
-  ports/                  Interfaces adapters must implement
-    StoragePort.ts        key/value persistence
-    EncryptionPort.ts     encrypt/decrypt
-    AiEnginePort.ts       run an agent prompt against text
-  services/                VaultService, BufferService, AiService
-  utils/date.ts           pure date helpers (see note below)
+**No account. No cloud sync. Your journal stays in your browser.**
 
-webapp/                   The only Node project / Vite root.
-  adapters/                LocalStorageAdapter, CryptoJSAdapter, OllamaAdapter
-                           — implement core's ports
-  src/main.ts              Bootstraps adapters -> services, wires up the UI
-  public/                  Static assets, served as-is at the site root
-  index.html
-```
+**Try DayMemory:** [daymemory.pages.dev](https://daymemory.pages.dev/)
 
-## One deviation from the requested structure
+> DayMemory is a personal journaling app, not an independently audited security product. Read [Privacy and encryption](#privacy-and-encryption) before putting sensitive information in it.
 
-`core/utils/date.ts` wasn't in the original file list. `VaultService`
-needs `formatReadableDate()` to build entries (it's not just a UI
-concern — buffer-merge and saveEntry both call it), so it lives in core
-as a small pure-function module rather than being duplicated in the
-webapp. `main.ts` imports the same module for the UI-side date labels.
+## What you can do
 
-Also: the earlier discussed "Zod-first" plan for the models was
-dropped. Zod is an npm package, and `core/` sits outside `webapp/`'s
-node_modules tree — since you asked for a single Node repo confined to
-webapp/ (no workspaces), TypeScript can't resolve `zod` from files in
-`core/`. Plain TS interfaces plus one small runtime shape-check
-(`isTimeline` in `core/models/Memory.ts`) do the same job here without
-that friction.
+- **Write right away.** The writing space is available before you unlock your vault, with automatic timestamps and autosave.
+- **Keep a searchable history.** Unlock to bring your pending writing into your journal, browse it, search for phrases, and edit entries.
+- **Protect your vault with a password.** Journal history is encrypted before it is saved to browser storage.
+- **Back up and restore.** Export an encrypted vault string for safekeeping, or import an encrypted backup or plain text history.
+- **Make it yours.** Choose light, dark, or system theme, and set a reminder to export a backup.
+- **Take it offline.** Install DayMemory as a PWA; its service worker caches the app shell for offline use after the app has loaded.
 
-## Setup
+The **Analytics** screen is currently a coming-soon placeholder; analytics and AI-powered insights are not available in the app yet.
+
+## Get started
+
+You’ll need a recent version of Node.js and npm.
 
 ```bash
 cd webapp
 npm install
-npm run dev       # http://localhost:5173
-npm run build     # type-checks, then builds to webapp/dist
-npm run preview   # serve the production build locally
+npm run dev
 ```
 
-## Static assets
+Open the local URL printed by Vite. To create and preview a production build:
 
-Your `style.css`, `crypto-js.min.js`, `service-worker.js`,
-`manifest.json`, and both icons are already in `webapp/public/` —
-Vite copies that folder's contents to the output root untouched, so
-they're referenced in `index.html` as root-relative paths
-(`/style.css`, `/crypto-js.min.js`, etc.), both in dev and in the
-built `dist/`.
+```bash
+npm run build
+npm run preview
+```
 
-`crypto-js.min.js` is still loaded as a plain `<script>` tag (a global
-`CryptoJS`, exactly like before) rather than npm-installed — it's
-declared as an ambient type in
-`webapp/adapters/types/crypto-js.d.ts` so `CryptoJSAdapter.ts` can use
-it under `strict` TypeScript.
+The production files are written to `webapp/dist`. Deploy that directory to a static host. The current app and service worker use root-relative URLs, so serve DayMemory from the site root (or update the app’s base paths and service-worker scope for a subdirectory deployment). Use HTTPS in production; browsers only allow service workers in secure contexts (with localhost as a development exception).
 
-`service-worker.js` was updated: it no longer tries to precache
-`script.js` by name, since Vite's built JS bundle has a hashed
-filename decided at build time. Instead it precaches the stable-named
-shell files (`index.html`, `style.css`, icons, `manifest.json`,
-`crypto-js.min.js`), and the existing cache-on-first-fetch logic in
-the `fetch` handler picks up the hashed `/assets/*.js` bundle
-automatically the first time it's requested.
+## Privacy and encryption
 
-## UI
+DayMemory has no account or application backend. The vault and writing buffer are stored in the browser’s **IndexedDB**. The app does not sync your entries to a DayMemory server. Installing the PWA does not move your data off the device.
 
-Not restructured, as requested — `webapp/src/main.ts` is a
-straight port of the original `script.js`'s DOM logic, typed, with
-every direct `localStorage`/`CryptoJS`/`fetch` call replaced by a call
-into `VaultService` / `BufferService` / `AiService`.
+### What is encrypted
+
+The vault is encrypted by the `CryptoJSAdapter` before it is written to IndexedDB. It uses CryptoJS’s passphrase-based `AES.encrypt` API. With the library defaults used here, that means **AES-256-CBC with PKCS#7 padding** and a salted, OpenSSL-compatible ciphertext format.
+
+### Important limitations
+
+- **Quick writing comes first.** All writing starts in the quick writing space, which is autosaved locally as plain text while the vault is locked. When you unlock, DayMemory adds that writing to the encrypted vault and clears the pending buffer.
+- **The passphrase derivation is a legacy default.** CryptoJS’s passphrase API uses an MD5-based EVP_BytesToKey-style derivation, not a modern password-hardening KDF such as Argon2id or scrypt. Choose a long, unique passphrase.
+- **AES-CBC does not authenticate the ciphertext.** The current format has no authentication tag, so it does not provide a cryptographic integrity check. Wrong passwords or damaged data may not always be distinguishable from valid plaintext.
+- **There is no password recovery.** If you lose your password, there is no way to open that encrypted vault. This is intentional: DayMemory has no account or recovery key that could bypass your password.
+- **Browser storage is not a backup.** Clearing site data, losing the device, or browser storage failure can remove your journal. Export your encrypted vault regularly and keep the backup somewhere safe.
+- **Plain text exports are readable.** Anyone with an unencrypted export can read your history. Use plain text export when you want to migrate your writing to another app.
+
+An encrypted backup contains the vault ciphertext, not your password. Someone with the backup string still needs the vault password to decrypt it, so you can store encrypted backups with a cloud provider or share the string without sharing your password. Keep your password secret; anyone who has both can access the vault.
+
+## Built with
+
+- **Vue 3**, **TypeScript**, and **Vite**
+- **IndexedDB** for browser-local persistence
+- **CryptoJS** for passphrase-based AES encryption
+- **Hexagonal architecture**: the TypeScript core contains domain models and services, and depends on storage and encryption ports rather than browser APIs. The web app supplies adapters for IndexedDB and CryptoJS.
+- **PWA service worker** for caching the application shell
+
+## Your data, your choice
+
+DayMemory supports both encrypted backups and plain text export/import, so you can back up your vault, move it between devices, or migrate your writing to another app. Encrypted backups can be restored with the password used to create them. Plain text export is available when you need portable, readable history.
+
+## Project layout
+
+```text
+core/
+  models/       Vault data and journal types
+  ports/        Storage and encryption interfaces
+  services/     Vault and pending-writing behavior
+  utils/        Timestamp helpers
+webapp/
+  adapters/     IndexedDB and CryptoJS browser adapters
+  src/          Vue application and views
+  public/       Styles, icons, manifest, and service worker
+```
