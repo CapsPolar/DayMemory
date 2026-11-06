@@ -2,6 +2,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { getTheme, setTheme, type Theme } from "../theme";
+import LegalView from "./LegalView.vue";
 
 const props = defineProps<{
   backupVisible: boolean;
@@ -55,8 +56,14 @@ const info = computed(() => modeInfo[props.backupMode]);
 const isImport = computed(() => props.backupMode.includes("import"));
 const showClipboardFallback = ref(false);
 
+const acceptedImportRisk = ref(false);
+const showLegalViewModal = ref(false);
+
 watch(() => props.backupVisible, (visible) => {
-  if (!visible) showClipboardFallback.value = false;
+  if (!visible) {
+    showClipboardFallback.value = false;
+    acceptedImportRisk.value = false;
+  }
 });
 
 const themes: { value: Theme; label: string }[] = [
@@ -122,6 +129,8 @@ function triggerFileInput(): void {
   <button v-if="!exportOnly" class="list-row" @click="emit('openImport', 'encrypted')">Import encrypted vault string</button>
   <button v-if="!exportOnly" class="list-row" @click="emit('openImport', 'unencrypted')">Import unencrypted plain history text</button>
   <button v-if="!isFirstTimeImport && !exportOnly" class="list-row" @click="emit('togglePasswordPanel')">Change password</button>
+  
+  <button class="list-row" @click="showLegalViewModal = true">Legal & terms</button>
 
   <div v-if="backupVisible" class="panel">
     <p class="hint">
@@ -156,7 +165,18 @@ function triggerFileInput(): void {
         Copy to clipboard
       </button>
     </template>
-    <button v-else class="btn danger" @click="emit('submitBackup', 'restore')">Restore backup (overwrite)</button>
+    <template v-else>
+      <div style="margin: 12px 0; font-size: 13px;">
+  <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; opacity: 0.85;">
+    <input v-model="acceptedImportRisk" type="checkbox" style="margin-top: 2px;" />
+    <span>
+      I understand this software comes with no warranties and use it at my own risk. 
+      <button type="button" class="text-btn" style="display: inline; padding: 0; font-size: inherit; text-decoration: underline;" @click.prevent="showLegalViewModal = true">Learn more</button>
+    </span>
+  </label>
+</div>
+      <button class="btn danger" :disabled="!acceptedImportRisk" @click="emit('submitBackup', 'restore')">Restore backup (overwrite)</button>
+    </template>
 
     <span class="status" aria-live="polite">{{ backupStatus }}</span>
   </div>
@@ -189,4 +209,14 @@ function triggerFileInput(): void {
     <button class="btn" @click="emit('submitPassword')">Update password</button>
     <span class="status" aria-live="polite">{{ passwordStatus }}</span>
   </div>
+
+  <!-- Legal Modal Overlay from Settings -->
+  <Transition name="sheet-slide">
+    <div v-if="showLegalViewModal" class="sheet-backdrop" @click.self="showLegalViewModal = false" style="z-index: 100;">
+      <div class="sheet" style="height: 80vh;">
+        <div class="sheet-handle" />
+        <LegalView :show-back="true" @back="showLegalViewModal = false" />
+      </div>
+    </div>
+  </Transition>
 </template>

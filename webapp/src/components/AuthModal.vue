@@ -1,6 +1,7 @@
 <!-- AuthModal.vue -->
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
+import LegalView from "./LegalView.vue";
 
 interface WritingSpaceSection {
   timestamp: string;
@@ -25,6 +26,19 @@ const emit = defineEmits<{
   openFirstTimeImport: [];
   openLockedExport: [];
 }>();
+
+const acceptedLegality = ref(false);
+const showLegalModal = ref(false);
+
+const showLegalitySection = computed(() => {
+  return props.firstTime || props.importing !== null;
+});
+
+const canSubmit = computed(() => {
+  if (props.unlocking || !props.password.trim()) return false;
+  if (showLegalitySection.value && !acceptedLegality.value) return false;
+  return true;
+});
 
 const authTitle = computed(() => {
   if (props.importing === "plain") return "Set password";
@@ -77,7 +91,6 @@ function focusLastTextarea(event: MouseEvent): void {
     const lastTextarea = textareas[textareas.length - 1];
     if (lastTextarea) {
       lastTextarea.focus();
-      // Move cursor to end of text
       lastTextarea.setSelectionRange(lastTextarea.value.length, lastTextarea.value.length);
     }
   }
@@ -94,24 +107,16 @@ function focusLastTextarea(event: MouseEvent): void {
     <main class="view write" @click="focusLastTextarea">
       <template v-for="(section, index) in writingSpaceSections" :key="index">
         <p v-if="section.timestamp" class="entry-time">{{ section.timestamp }}</p>
-        <textarea
-          :id="index === 0 ? 'buffer-input' : undefined"
+        <textarea :id="index === 0 ? 'buffer-input' : undefined"
           :value="section.text.slice(leadingSpace(section.text).length)"
-          :placeholder="index === writingSpaceSections.length - 1 ? 'Write here' : undefined"
-          class="write-area"
+          :placeholder="index === writingSpaceSections.length - 1 ? 'Write here' : undefined" class="write-area"
           :aria-label="`Writing section ${index + 1}`"
-          @input="updateWritingSpaceSection(index, ($event.target as HTMLTextAreaElement).value)"
-        />
+          @input="updateWritingSpaceSection(index, ($event.target as HTMLTextAreaElement).value)" />
       </template>
     </main>
 
-    <button
-      v-if="mode === 'writingSpace' && !importing"
-      type="button"
-      class="fab"
-      :aria-label="firstTime ? 'Encrypt writing space' : 'Unlock Vault'"
-      @click="emit('toggleMode')"
-    >
+    <button v-if="mode === 'writingSpace' && !importing" type="button" class="fab"
+      :aria-label="firstTime ? 'Encrypt writing space' : 'Unlock Vault'" @click="emit('toggleMode')">
       <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
         <rect x="5" y="11" width="14" height="9" rx="2" />
         <path d="M8 11V8a4 4 0 0 1 7.5-2" />
@@ -120,23 +125,14 @@ function focusLastTextarea(event: MouseEvent): void {
     </button>
 
     <Transition name="sheet-slide">
-      <div
-        v-if="mode === 'unlock' || importing"
-        class="sheet-backdrop"
-        @click.self="!importing && emit('toggleMode')"
-      >
+      <div v-if="mode === 'unlock' || importing" class="sheet-backdrop" @click.self="!importing && emit('toggleMode')">
         <div class="sheet auth-sheet">
           <div class="sheet-handle" />
 
-          <form class="sheet-form" @submit.prevent="emit('unlock')">
+          <form class="sheet-form" @submit.prevent="canSubmit && emit('unlock')">
             <header class="app-header">
-              <button
-                v-if="!importing"
-                type="button"
-                class="sheet-action-btn cancel"
-                aria-label="Close"
-                @click="emit('toggleMode')"
-              >
+              <button v-if="!importing" type="button" class="sheet-action-btn cancel" aria-label="Close"
+                @click="emit('toggleMode')">
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                   <line x1="18" y1="6" x2="6" y2="18" />
                   <line x1="6" y1="6" x2="18" y2="18" />
@@ -146,12 +142,7 @@ function focusLastTextarea(event: MouseEvent): void {
 
               <h1>{{ authTitle }}</h1>
 
-              <button
-                type="submit"
-                class="sheet-action-btn submit"
-                aria-label="Submit password"
-                :disabled="unlocking"
-              >
+              <button type="submit" class="sheet-action-btn submit" aria-label="Submit password" :disabled="!canSubmit">
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
@@ -160,35 +151,42 @@ function focusLastTextarea(event: MouseEvent): void {
 
             <div class="sheet-content">
               <p class="hint">{{ authHint }}</p>
-              <input
-                id="password-input"
-                :value="password"
-                type="password"
-                :placeholder="authPlaceholder"
-                :aria-label="authPlaceholder"
-                required
-                autocomplete="off"
-                :disabled="unlocking"
-                @input="emit('update:password', ($event.target as HTMLInputElement).value)"
-              />
-              <button
-                v-if="firstTime && !importing"
-                type="button"
-                class="text-btn muted"
-                @click="emit('openFirstTimeImport')"
-              >
+              <input id="password-input" :value="password" type="password" :placeholder="authPlaceholder"
+                :aria-label="authPlaceholder" required autocomplete="off" :disabled="unlocking"
+                @input="emit('update:password', ($event.target as HTMLInputElement).value)" />
+
+              <div v-if="showLegalitySection" style="margin-top: 14px; font-size: 13px;">
+                <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; opacity: 0.85;">
+                  <input v-model="acceptedLegality" type="checkbox" style="margin-top: 2px;" />
+                  <span>
+                    I understand this software comes with no warranties and use it at my own risk.
+                    <button type="button" class="text-btn"
+                      style="display: inline; padding: 0; font-size: inherit; text-decoration: underline;"
+                      @click.prevent="showLegalModal = true">Learn more</button>
+                  </span>
+                </label>
+              </div>
+
+              <button v-if="firstTime && !importing" type="button" class="text-btn muted"
+                @click="emit('openFirstTimeImport')">
                 Looking to restore your vault? Import vault
               </button>
-              <button
-                v-if="!firstTime && importing !== 'plain'"
-                type="button"
-                class="text-btn muted"
-                @click="emit('openLockedExport')"
-              >
+              <button v-if="!firstTime && importing !== 'plain'" type="button" class="text-btn muted"
+                @click="emit('openLockedExport')">
                 Export encrypted vault string
               </button>
             </div>
           </form>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- Legal View Modal Overlay -->
+    <Transition name="sheet-slide">
+      <div v-if="showLegalModal" class="sheet-backdrop" @click.self="showLegalModal = false" style="z-index: 100;">
+        <div class="sheet" style="height: 80vh;">
+          <div class="sheet-handle" />
+          <LegalView :show-back="true" @back="showLegalModal = false" />
         </div>
       </div>
     </Transition>

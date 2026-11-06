@@ -59,6 +59,12 @@ The vault is encrypted by the `CryptoJSAdapter` before it is written to IndexedD
 
 An encrypted backup contains the vault ciphertext, not your password. Someone with the backup string still needs the vault password to decrypt it, so you can store encrypted backups with a cloud provider or share the string without sharing your password. Keep your password secret; anyone who has both can access the vault.
 
+## Disclaimer and your responsibility
+
+DayMemory is provided “as is” and “as available,” without warranties, including any guarantee of uptime, data integrity, or compatibility. Use it at your own risk. To the extent permitted by law, the authors and contributors are not liable for damages resulting from use of the app, including data loss, corruption, or security breaches.
+
+You are responsible for keeping secure backups and safeguarding your master password. If you lose your password or your browser storage is erased, your vault cannot be recovered.
+
 ## Built with
 
 - **Vue 3**, **TypeScript**, and **Vite**
