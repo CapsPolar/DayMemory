@@ -6,7 +6,7 @@ DayMemory is a private, local-first journal for the things you want to remember:
 
 **No account. No cloud sync. Your journal stays in your browser.**
 
-**Try DayMemory:** [daymemory.pages.dev](https://daymemory.pages.dev/)
+**Use DayMemory:** [daymemory.pages.dev](https://daymemory.pages.dev/)
 
 > DayMemory is a personal journaling app, not an independently audited security product. Read [Privacy and encryption](#privacy-and-encryption) before putting sensitive information in it.
 
