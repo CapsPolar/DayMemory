@@ -10,7 +10,7 @@ defineEmits<{
 </script>
 
 <template>
-  <div class="app">
+  <div class="app legal-view">
     <header class="app-header">
       <button v-if="showBack" type="button" class="text-btn" @click="$emit('back')">Back</button>
       <h1 v-else>Legal & Terms</h1>
@@ -40,3 +40,15 @@ defineEmits<{
     </main>
   </div>
 </template>
+
+<style scoped>
+.legal-view {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+
+.legal-view .view {
+  min-height: 0;
+}
+</style>
