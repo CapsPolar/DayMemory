@@ -2,7 +2,7 @@
 // Caches the app shell so it works fully offline once installed.
 
 const CACHE_NAME = 'daymemory-cache-v4';
-const WORKER_ID = '1'
+const WORKER_ID = '290110b3-2d11-49fc-bc75-63b6f9fa3a50'
 
 const APP_SHELL = [
   '/',
