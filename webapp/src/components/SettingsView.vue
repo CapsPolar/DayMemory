@@ -131,6 +131,14 @@ function triggerFileInput(): void {
   <button v-if="!isFirstTimeImport && !exportOnly" class="list-row" @click="emit('togglePasswordPanel')">Change password</button>
   
   <button class="list-row" @click="showLegalViewModal = true">Legal & terms</button>
+  <a
+    class="list-row source-link"
+    href="https://github.com/CapsPolar/DayMemory"
+    target="_blank"
+    rel="noopener noreferrer"
+  >
+    Open-source project on GitHub
+  </a>
 
   <div v-if="backupVisible" class="panel">
     <p class="hint">
